@@ -1,0 +1,15 @@
+# Core
+Django~=5.2.13
+djangorestframework~=3.16.0
+djangorestframework-simplejwt~=5.3
+
+# Database driver (PostgreSQL)
+psycopg[binary]~=3.2
+
+# API tooling
+django-cors-headers~=4.6
+django-filter~=24.3
+drf-spectacular~=0.28.0
+
+# Production server
+gunicorn~=23.0
