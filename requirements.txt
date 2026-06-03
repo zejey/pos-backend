@@ -13,3 +13,4 @@ drf-spectacular~=0.28.0
 
 # Production server
 gunicorn~=23.0
+whitenoise~=6.8

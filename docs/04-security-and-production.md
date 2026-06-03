@@ -4,17 +4,19 @@ The current settings are tuned for **development** (DEBUG on, permissive CORS,
 default secret). Address these before any real deployment or the deployment-demo
 video.
 
+> **Status: SEC-01–08 implemented (2026-06-04); SEC-09 partially covered.**
+
 | ID | Priority | Effort | Status | Item |
 |----|----------|--------|--------|------|
-| SEC-01 | P0 | S | TODO | Fail fast on insecure prod config |
-| SEC-02 | P0 | S | TODO | Lock `ALLOWED_HOSTS` and CORS in prod |
-| SEC-03 | P1 | S | TODO | Server-side logout (JWT blacklist) |
-| SEC-04 | P1 | S | TODO | Serve static files in prod (WhiteNoise) |
-| SEC-05 | P1 | S | TODO | Security headers / HTTPS settings |
-| SEC-06 | P2 | S | TODO | API throttling / rate limits |
-| SEC-07 | P2 | M | TODO | DB backup & restore procedure |
-| SEC-08 | P2 | S | TODO | Production compose + gunicorn tuning |
-| SEC-09 | P3 | S | TODO | Login brute-force protection |
+| SEC-01 | P0 | S | ✅ DONE | Fail fast on insecure prod config |
+| SEC-02 | P0 | S | ✅ DONE | Lock `ALLOWED_HOSTS` and CORS in prod |
+| SEC-03 | P1 | S | ✅ DONE | Server-side logout (JWT blacklist) — `POST /api/auth/logout/` |
+| SEC-04 | P1 | S | ✅ DONE | Serve static files in prod (WhiteNoise) |
+| SEC-05 | P1 | S | ✅ DONE | Security headers / HTTPS settings |
+| SEC-06 | P2 | S | ✅ DONE | API throttling / rate limits (login scoped tighter) |
+| SEC-07 | P2 | M | ✅ DONE | DB backup & restore procedure → [05](05-deployment-guide.md) |
+| SEC-08 | P2 | S | ✅ DONE | Production compose (`docker-compose.prod.yml`) + gunicorn |
+| SEC-09 | P3 | S | ◑ PARTIAL | Brute-force: login throttle in place; `django-axes` lockout not added |
 
 ---
 

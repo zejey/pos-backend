@@ -53,6 +53,12 @@ python manage.py runserver
 | `CORS_ALLOWED_ORIGINS` | Frontend origins | `localhost:3000,localhost:5173` |
 | `POS_TAX_RATE` | VAT % (inclusive); `0` disables tax | `12` |
 | `POS_TAX_LABEL` | Tax label shown on receipts | `VAT` |
+| `POS_RECEIPT_PREFIX` | Receipt number prefix (per store) | `R` |
+| `THROTTLE_ANON` / `THROTTLE_USER` / `THROTTLE_LOGIN` | DRF rate limits | `60/min` / `1000/min` / `10/min` |
+| `DJANGO_SECURE_SSL_REDIRECT` | Force HTTPS redirect (prod) | `True` |
+
+> When `DJANGO_DEBUG=False`, the app refuses to start unless `DJANGO_SECRET_KEY`,
+> `DJANGO_ALLOWED_HOSTS`, and `CORS_ALLOWED_ORIGINS` are explicitly set (SEC-01/02).
 
 ## 4. First-run checklist
 - [ ] `.env` created with a strong `DJANGO_SECRET_KEY`
@@ -69,7 +75,19 @@ DEBUG off, locked hosts/CORS, WhiteNoise static, security headers, gunicorn via
 python manage.py check --deploy
 ```
 
-## 6. Troubleshooting
+## 6. Database backup & restore (SEC-07)
+
+The Postgres data lives in the `pgdata` volume. Back it up regularly:
+
+```bash
+# Backup (writes a timestamped dump to the host)
+docker compose exec -T db pg_dump -U pos pos > backup_$(date +%F).sql
+
+# Restore into a fresh database
+cat backup_2026-01-01.sql | docker compose exec -T db psql -U pos -d pos
+```
+
+## 7. Troubleshooting
 - **`web` can't reach DB:** ensure the `db` healthcheck is green; web waits on it.
 - **CORS errors in the browser:** add the frontend URL to `CORS_ALLOWED_ORIGINS`.
 - **Static/admin unstyled under gunicorn:** WhiteNoise + `collectstatic` (SEC-04).

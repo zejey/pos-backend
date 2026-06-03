@@ -2,6 +2,10 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.common.permissions import IsAdmin
@@ -21,6 +25,32 @@ class LoginView(TokenObtainPairView):
     """POST username/password -> access + refresh tokens + user payload."""
 
     serializer_class = LoginSerializer
+    throttle_classes = [ScopedRateThrottle]  # tighter limit on credential attempts
+    throttle_scope = "login"
+
+
+class LogoutView(APIView):
+    """Server-side logout (SEC-03): blacklist the supplied refresh token."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = request.data.get("refresh")
+        if not token:
+            return Response(
+                {"detail": "A 'refresh' token is required.", "code": "required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            RefreshToken(token).blacklist()
+        except TokenError:
+            return Response(
+                {"detail": "Invalid or expired refresh token.", "code": "invalid"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        log_activity(request.user, "LOGOUT", entity="User",
+                     entity_id=request.user.pk, request=request)
+        return Response({"detail": "Logged out."})
 
 
 class UserViewSet(viewsets.ModelViewSet):
