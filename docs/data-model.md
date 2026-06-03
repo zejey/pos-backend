@@ -166,7 +166,9 @@ A sales transaction.
 | discount | FK → Discount | nullable (SET_NULL) |
 | subtotal | decimal(14,2) | |
 | discount_total | decimal(14,2) | |
-| total | decimal(14,2) | |
+| total | decimal(14,2) | gross; VAT-inclusive (tax is *carved out*, not added) |
+| tax_rate | decimal(5,2) | VAT % snapshotted at creation (from `POS_TAX_RATE`); 0 = no tax |
+| tax_amount | decimal(14,2) | VAT portion carved out of `total` (= total × rate ÷ (100+rate)) |
 | note | char(255) | optional |
 | completed_at / voided_at | datetime | nullable |
 | void_reason | char(255) | optional |

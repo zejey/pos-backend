@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from rest_framework import serializers
 
 from apps.catalog.models import Product
@@ -42,23 +43,26 @@ class SaleSerializer(serializers.ModelSerializer):
     cashier = serializers.CharField(source="cashier.username", default=None, read_only=True)
     amount_paid = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     change_due = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    net_of_tax = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 
     class Meta:
         model = Sale
         fields = [
             "id", "receipt_no", "cashier", "status", "discount",
             "subtotal", "discount_total", "total",
+            "tax_rate", "tax_amount", "net_of_tax",
             "amount_paid", "change_due", "note",
             "items", "payments", "cart",
             "completed_at", "voided_at", "void_reason", "created_at",
         ]
         read_only_fields = [
             "receipt_no", "status", "subtotal", "discount_total", "total",
+            "tax_rate", "tax_amount",
             "completed_at", "voided_at", "void_reason",
         ]
 
     def create(self, validated_data):
-        from .services import set_sale_items
+        from .services import current_tax_rate, set_sale_items
 
         cart = validated_data.pop("cart", [])
         request = self.context.get("request")
@@ -66,6 +70,7 @@ class SaleSerializer(serializers.ModelSerializer):
             cashier=getattr(request, "user", None),
             discount=validated_data.get("discount"),
             note=validated_data.get("note", ""),
+            tax_rate=current_tax_rate(),  # snapshot at creation
         )
         if cart:
             set_sale_items(sale, cart)
@@ -88,11 +93,17 @@ class ReceiptSerializer(serializers.ModelSerializer):
     cashier = serializers.CharField(source="cashier.username", default=None, read_only=True)
     amount_paid = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     change_due = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    net_of_tax = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    tax_label = serializers.SerializerMethodField()
 
     class Meta:
         model = Sale
         fields = [
             "receipt_no", "cashier", "completed_at",
             "items", "subtotal", "discount_total", "total",
+            "tax_label", "tax_rate", "tax_amount", "net_of_tax",
             "payments", "amount_paid", "change_due",
         ]
+
+    def get_tax_label(self, obj):
+        return settings.POS_TAX_LABEL

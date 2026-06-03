@@ -82,9 +82,12 @@ class SaleViewSet(viewsets.ModelViewSet):
         qs = Sale.objects.filter(
             status=Sale.Status.COMPLETED, completed_at__date=today
         )
-        agg = qs.aggregate(count=Count("id"), total=Sum("total"))
+        agg = qs.aggregate(
+            count=Count("id"), total=Sum("total"), tax=Sum("tax_amount")
+        )
         return Response({
             "date": today,
             "transactions": agg["count"] or 0,
             "gross_sales": agg["total"] or Decimal("0.00"),
+            "total_tax": agg["tax"] or Decimal("0.00"),
         })

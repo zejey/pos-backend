@@ -1,6 +1,7 @@
 """POS business logic: build cart, complete (deduct stock), void (reverse)."""
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -13,10 +14,26 @@ from apps.pricing.services import get_effective_price
 from .models import Payment, Sale, SaleItem
 
 CENTS = Decimal("0.01")
+HUNDRED = Decimal("100")
+
+
+def current_tax_rate():
+    """The configured VAT rate (percent) snapshotted onto new sales."""
+    return Decimal(settings.POS_TAX_RATE)
+
+
+def vat_inclusive_tax(gross, rate):
+    """VAT portion carved out of a tax-inclusive `gross` amount.
+
+    For a gross that already includes `rate`% VAT: tax = gross * rate / (100 + rate).
+    """
+    if rate <= 0:
+        return Decimal("0.00")
+    return (gross * rate / (HUNDRED + rate)).quantize(CENTS, rounding=ROUND_HALF_UP)
 
 
 def _recalculate(sale):
-    """Recompute subtotal/discount/total from the sale's current items."""
+    """Recompute subtotal/discount/total (and carved-out VAT) from the items."""
     subtotal = sum((i.line_total for i in sale.items.all()), Decimal("0.00"))
     discount_total = Decimal("0.00")
     if sale.discount and sale.discount.is_available():
@@ -24,7 +41,10 @@ def _recalculate(sale):
     sale.subtotal = subtotal.quantize(CENTS)
     sale.discount_total = discount_total
     sale.total = (subtotal - discount_total).quantize(CENTS)
-    sale.save(update_fields=["subtotal", "discount_total", "total", "updated_at"])
+    sale.tax_amount = vat_inclusive_tax(sale.total, sale.tax_rate)
+    sale.save(update_fields=[
+        "subtotal", "discount_total", "total", "tax_amount", "updated_at",
+    ])
     return sale
 
 

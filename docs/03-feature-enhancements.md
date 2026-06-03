@@ -24,11 +24,14 @@ the professor confirms as the target business.
 
 | ID | Priority | Effort | Status | Item |
 |----|----------|--------|--------|------|
-| FEAT-06 | P1 | M | TODO | VAT / tax support (PH 12% VAT, inclusive/exclusive) on sales, receipts, reports |
+| FEAT-06 | P1 | M | ◑ PARTIAL | VAT tax support — **inclusive** done (configurable `POS_TAX_RATE`, on sales/receipts/reports); exclusive mode not built |
 | FEAT-07 | P3 | M | TODO | Product variants / modifiers (sizes, add-ons) |
 
-- **FEAT-06** is high value for real-world applicability (a grading criterion).
-  Add tax config in settings/store profile; show VAT breakdown on the receipt.
+- **FEAT-06** ◑ Done for **VAT-inclusive**: rate is configurable via
+  `POS_TAX_RATE` (default 12, `0` disables) and snapshotted per sale; the tax is
+  carved out of the total and shown on the receipt (`tax_amount`, `net_of_tax`,
+  `tax_label`) and in reports. Remaining: a VAT-**exclusive** mode (add on top)
+  if a target business needs it.
 
 ## C. Inventory & Purchasing
 

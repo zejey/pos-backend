@@ -38,6 +38,12 @@ class Sale(TimeStampedModel):
     discount_total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
 
+    # VAT-inclusive: `total` already includes tax; `tax_amount` is the portion
+    # carved out for the receipt. `tax_rate` (percent) is snapshotted at sale
+    # creation so a later config change never rewrites historical receipts.
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+
     note = models.CharField(max_length=255, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     voided_at = models.DateTimeField(null=True, blank=True)
@@ -61,6 +67,11 @@ class Sale(TimeStampedModel):
     def change_due(self):
         change = self.amount_paid - self.total
         return change if change > 0 else Decimal("0.00")
+
+    @property
+    def net_of_tax(self):
+        """VATable amount: the total minus the carved-out tax (POS standard)."""
+        return (self.total - self.tax_amount).quantize(Decimal("0.01"))
 
 
 class SaleItem(models.Model):

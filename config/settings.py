@@ -6,6 +6,7 @@ and in deployment. See .env.example for the supported variables.
 """
 import os
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -163,3 +164,11 @@ CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"
 )
 CORS_ALLOW_ALL_ORIGINS = DEBUG and not CORS_ALLOWED_ORIGINS
+
+# --- Tax (VAT) --------------------------------------------------------------
+# VAT-inclusive: selling prices already include this rate, so the sale total is
+# unchanged; the tax portion is carved out of the total for the receipt. The
+# rate is snapshotted onto each sale at creation, so changing it never rewrites
+# historical receipts. Set POS_TAX_RATE=0 to disable tax entirely.
+POS_TAX_RATE = Decimal(os.environ.get("POS_TAX_RATE", "12"))  # percent
+POS_TAX_LABEL = os.environ.get("POS_TAX_LABEL", "VAT")

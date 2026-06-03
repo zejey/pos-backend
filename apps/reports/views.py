@@ -63,6 +63,7 @@ class SalesSummaryReport(APIView):
             transactions=Count("id"),
             gross_sales=Coalesce(Sum("total"), ZERO),
             total_discount=Coalesce(Sum("discount_total"), ZERO),
+            total_tax=Coalesce(Sum("tax_amount"), ZERO),
         )
         return Response({
             "period": period,
@@ -71,6 +72,8 @@ class SalesSummaryReport(APIView):
             "transactions": agg["transactions"],
             "gross_sales": agg["gross_sales"],
             "total_discount": agg["total_discount"],
+            "total_tax": agg["total_tax"],
+            "net_of_tax": agg["gross_sales"] - agg["total_tax"],
         })
 
 

@@ -28,7 +28,7 @@ criterion) and round out the deliverables.
 | SEC-04 + SEC-05 Static + headers | Real deployment; `check --deploy` clean |
 | FEAT-03 Shift / cash-drawer | Strong POS realism; deepens daily-sales |
 | FEAT-01 Refunds | Real stores need returns, not just voids |
-| FEAT-06 VAT/tax | Real-world receipts (esp. coffee shop / grocery) |
+| FEAT-06 VAT/tax (◑ inclusive done; exclusive remains) | Real-world receipts (esp. coffee shop / grocery) |
 | FEAT-13 Report export (CSV) | Feeds Business team artifacts |
 | TEST-03 + TEST-04 | Permission & report coverage |
 | FIX-05 Paginate reports | Performance with a real catalog |

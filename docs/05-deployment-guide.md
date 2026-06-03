@@ -51,6 +51,8 @@ python manage.py runserver
 | `POS_DB_ENGINE` | `postgres` or `sqlite` | `postgres` |
 | `POSTGRES_DB/USER/PASSWORD/HOST/PORT` | DB connection | `pos/pos/pos/db/5432` |
 | `CORS_ALLOWED_ORIGINS` | Frontend origins | `localhost:3000,localhost:5173` |
+| `POS_TAX_RATE` | VAT % (inclusive); `0` disables tax | `12` |
+| `POS_TAX_LABEL` | Tax label shown on receipts | `VAT` |
 
 ## 4. First-run checklist
 - [ ] `.env` created with a strong `DJANGO_SECRET_KEY`
