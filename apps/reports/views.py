@@ -141,13 +141,14 @@ class StockInHistoryReport(APIView):
                 status=StockIn.Status.POSTED,
                 purchase_date__range=(start, end),
             )
+            .select_related("supplier")
             .prefetch_related("items")
             .order_by("-purchase_date")
         )
         results = [{
             "id": s.id,
             "reference_no": s.reference_no,
-            "supplier": s.supplier,
+            "supplier": s.supplier.name if s.supplier else None,
             "purchase_date": s.purchase_date,
             "total_cost": s.total_cost,
             "item_count": s.items.count(),

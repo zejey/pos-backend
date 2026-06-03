@@ -41,7 +41,7 @@ matrix in [03](03-feature-enhancements.md)).
 | Item |
 |------|
 | FEAT-02 Per-line discounts · FEAT-04 Barcode lookup · FEAT-05 Parked sales |
-| FEAT-07 Variants/modifiers (coffee shop) · FEAT-08 Suppliers · FEAT-09 PO/reorder |
+| FEAT-07 Variants/modifiers (coffee shop) · FEAT-09 PO/reorder |
 | FEAT-10 CSV import · FEAT-11 Multi-location · FEAT-14 Notifications · FEAT-16 Images |
 | FIX-06..FIX-10 remaining hardening · SEC-06..SEC-09 · TEST-05 + TEST-06 (CI) |
 

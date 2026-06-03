@@ -1,6 +1,15 @@
 from rest_framework import serializers
 
-from .models import StockIn, StockInItem
+from .models import StockIn, StockInItem, Supplier
+
+
+class SupplierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Supplier
+        fields = [
+            "id", "name", "contact_person", "contact_no", "address",
+            "is_active", "created_at",
+        ]
 
 
 class StockInItemSerializer(serializers.ModelSerializer):
@@ -41,12 +50,15 @@ class StockInSerializer(serializers.ModelSerializer):
     created_by = serializers.CharField(
         source="created_by.username", default=None, read_only=True
     )
+    supplier_name = serializers.CharField(
+        source="supplier.name", default=None, read_only=True
+    )
 
     class Meta:
         model = StockIn
         fields = [
-            "id", "reference_no", "supplier", "purchase_date", "note",
-            "status", "created_by", "posted_at", "total_cost", "items",
+            "id", "reference_no", "supplier", "supplier_name", "purchase_date",
+            "note", "status", "created_by", "posted_at", "total_cost", "items",
             "created_at",
         ]
         read_only_fields = ["status", "posted_at", "created_by"]

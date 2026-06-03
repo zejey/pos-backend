@@ -17,6 +17,13 @@ work with IDs you can reference in commits, sprint backlogs, and standups.
 | [06-documentation-deliverables.md](06-documentation-deliverables.md) | Doc Deliverables | Mapping the brief's required docs to tasks (`DOC-xx`) |
 | [07-roadmap.md](07-roadmap.md) | Roadmap | Everything above, prioritized and sequenced into phases |
 
+## Reference (the system as it is)
+
+| File | What it covers |
+|------|----------------|
+| [data-model.md](data-model.md) | Every database table, field, and relationship (the **nouns**) |
+| [architecture-and-flow.md](architecture-and-flow.md) | How it's wired and how data flows; brief → code traceability (the **verbs**) |
+
 ## How to use this
 
 1. Read [07-roadmap.md](07-roadmap.md) first — it tells you **what to start with**.

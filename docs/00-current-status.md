@@ -22,7 +22,7 @@ record; all movements traceable.* Do not add code paths that write
 | **User Management** | ✅ | Admin/Cashier roles, JWT login + refresh, activity log. Logout is client-side only (see `SEC-03`). |
 | **Product catalog** | ✅ | Products, categories, bulk entry. `quantity_on_hand` read-only. |
 | **Inventory** | ✅ | Ledger, auto-deduction, low-stock endpoint, manual adjustment w/ mandatory reason. |
-| **Stock-in / Purchasing** | ✅ | Draft → post, reference no., discrepancy handling, cost refresh, audit trail. |
+| **Stock-in / Purchasing** | ✅ | Draft → post, reference no., discrepancy handling, cost refresh, audit trail. `supplier` is now a `Supplier` FK (was free text — `FEAT-08`). |
 | **Point of Sale** | ✅ | Cart, multi-payment, receipt payload, atomic deduction, void/reversal, daily summary. |
 | **Pricing & Discounts** | ✅ | Order-level %/fixed discount, product promo pricing. |
 | **Reports & Analytics** | ✅ | Sales summary (daily/weekly/monthly), top sellers, inventory status, stock-in history, profit estimate. |

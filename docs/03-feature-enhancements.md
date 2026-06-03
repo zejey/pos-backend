@@ -34,7 +34,7 @@ the professor confirms as the target business.
 
 | ID | Priority | Effort | Status | Item |
 |----|----------|--------|--------|------|
-| FEAT-08 | P2 | M | TODO | Supplier model (replace free-text `supplier` on stock-in) |
+| FEAT-08 | P2 | M | ✅ DONE | Supplier model (replaced free-text `supplier` on stock-in) — see [data-model.md](data-model.md) |
 | FEAT-09 | P2 | M | TODO | Purchase-order generation + reorder suggestions from low-stock |
 | FEAT-10 | P3 | S | TODO | Bulk CSV import (products, stock-in) |
 | FEAT-11 | P3 | L | TODO | Multi-location / branch stock |

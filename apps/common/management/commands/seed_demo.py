@@ -11,7 +11,7 @@ from django.core.management.base import BaseCommand
 
 from apps.accounts.models import User
 from apps.catalog.models import Category, Product
-from apps.purchasing.models import StockIn, StockInItem
+from apps.purchasing.models import StockIn, StockInItem, Supplier
 from apps.purchasing.services import post_stock_in
 
 
@@ -58,8 +58,12 @@ class Command(BaseCommand):
                 reorder_level=Decimal(reorder),
             ))
 
+        supplier = Supplier.objects.create(
+            name="Demo Supplier", contact_person="Juan dela Cruz",
+            contact_no="0917-000-0000",
+        )
         si = StockIn.objects.create(
-            reference_no="SEED-INV-001", supplier="Demo Supplier",
+            reference_no="SEED-INV-001", supplier=supplier,
             purchase_date=date.today(), created_by=admin,
         )
         for prod in products:

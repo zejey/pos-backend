@@ -7,6 +7,22 @@ from apps.catalog.models import Product
 from apps.common.models import TimeStampedModel
 
 
+class Supplier(TimeStampedModel):
+    """A vendor that products are purchased from."""
+
+    name = models.CharField(max_length=160, unique=True)
+    contact_person = models.CharField(max_length=120, blank=True)
+    contact_no = models.CharField(max_length=40, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class StockIn(TimeStampedModel):
     """A purchase / stock-in document (the start of the controlled flow).
 
@@ -22,7 +38,10 @@ class StockIn(TimeStampedModel):
         max_length=64, unique=True,
         help_text="Supplier receipt / invoice number.",
     )
-    supplier = models.CharField(max_length=160, blank=True)
+    supplier = models.ForeignKey(
+        Supplier, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="stock_ins",
+    )
     purchase_date = models.DateField()
     note = models.TextField(blank=True)
     status = models.CharField(
