@@ -1,5 +1,5 @@
 """POS business logic: build cart, complete (deduct stock), void (reverse)."""
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
@@ -7,13 +7,13 @@ from django.utils import timezone
 
 from apps.catalog.models import Product
 from apps.common.exceptions import BusinessRuleError
+from apps.common.money import money
 from apps.inventory.models import StockMovement
 from apps.inventory.services import apply_movement
 from apps.pricing.services import get_effective_price
 
 from .models import Payment, Sale, SaleItem
 
-CENTS = Decimal("0.01")
 HUNDRED = Decimal("100")
 
 
@@ -29,7 +29,7 @@ def vat_inclusive_tax(gross, rate):
     """
     if rate <= 0:
         return Decimal("0.00")
-    return (gross * rate / (HUNDRED + rate)).quantize(CENTS, rounding=ROUND_HALF_UP)
+    return money(gross * rate / (HUNDRED + rate))
 
 
 def _recalculate(sale):
@@ -38,9 +38,9 @@ def _recalculate(sale):
     discount_total = Decimal("0.00")
     if sale.discount and sale.discount.is_available():
         discount_total = sale.discount.compute(subtotal)
-    sale.subtotal = subtotal.quantize(CENTS)
-    sale.discount_total = discount_total
-    sale.total = (subtotal - discount_total).quantize(CENTS)
+    sale.subtotal = money(subtotal)
+    sale.discount_total = money(discount_total)
+    sale.total = money(subtotal - discount_total)
     sale.tax_amount = vat_inclusive_tax(sale.total, sale.tax_rate)
     sale.save(update_fields=[
         "subtotal", "discount_total", "total", "tax_amount", "updated_at",
@@ -66,8 +66,14 @@ def set_sale_items(sale, items):
         quantity = Decimal(entry["quantity"])
         if quantity <= 0:
             raise BusinessRuleError("Item quantity must be positive.")
+        if not product.is_active:
+            raise BusinessRuleError(f"Product {product.sku} is not active for sale.")
         unit_price = get_effective_price(product)
-        line_total = (unit_price * quantity).quantize(CENTS)
+        if unit_price <= 0:
+            raise BusinessRuleError(
+                f"Product {product.sku} has no sellable price."
+            )
+        line_total = money(unit_price * quantity)
         rows.append(SaleItem(
             sale=sale, product=product, quantity=quantity,
             unit_price=unit_price, line_total=line_total,
@@ -77,7 +83,15 @@ def set_sale_items(sale, items):
 
 
 def _generate_receipt_no(sale):
-    return f"R{timezone.now():%Y%m%d}-{sale.pk:06d}"
+    """Build the receipt number: ``{PREFIX}{YYYYMMDD}-{id:06d}``.
+
+    Concurrency-safe by construction: the sale's primary key is assigned by the
+    database and is globally unique, so two cashiers completing sales at the
+    same instant can never collide. The store prefix is configurable via
+    ``POS_RECEIPT_PREFIX``.
+    """
+    prefix = settings.POS_RECEIPT_PREFIX
+    return f"{prefix}{timezone.now():%Y%m%d}-{sale.pk:06d}"
 
 
 @transaction.atomic
@@ -88,10 +102,13 @@ def complete_sale(sale, payments, user=None):
     Stock is deducted atomically; if any line lacks stock the whole sale rolls
     back (InsufficientStock is raised).
     """
+    # Lock the row first, then check status against the persisted state — this
+    # is robust even if the caller passes a stale in-memory object.
+    sale = Sale.objects.select_for_update().get(pk=sale.pk)
     if sale.status != Sale.Status.DRAFT:
         raise BusinessRuleError("Only draft sales can be completed.")
 
-    sale = _recalculate(Sale.objects.select_for_update().get(pk=sale.pk))
+    sale = _recalculate(sale)
     items = list(sale.items.select_related("product").all())
     if not items:
         raise BusinessRuleError("Cannot complete a sale with no items.")

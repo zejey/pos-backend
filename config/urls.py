@@ -11,7 +11,10 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+from apps.common.views import HealthCheckView
+
 api_patterns = [
+    path("health/", HealthCheckView.as_view(), name="health"),
     path("auth/", include("apps.accounts.urls")),
     path("catalog/", include("apps.catalog.urls")),
     path("inventory/", include("apps.inventory.urls")),

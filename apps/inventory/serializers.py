@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from apps.catalog.models import Product
@@ -26,7 +28,8 @@ class ManualAdjustmentSerializer(serializers.Serializer):
 
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
     new_quantity = serializers.DecimalField(
-        max_digits=12, decimal_places=2, required=False, allow_null=True
+        max_digits=12, decimal_places=2, required=False, allow_null=True,
+        min_value=Decimal("0.00"),
     )
     delta = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, allow_null=True
@@ -38,4 +41,6 @@ class ManualAdjustmentSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "Provide exactly one of 'new_quantity' or 'delta'."
             )
+        if attrs.get("delta") is not None and attrs["delta"] == 0:
+            raise serializers.ValidationError("'delta' must be non-zero.")
         return attrs

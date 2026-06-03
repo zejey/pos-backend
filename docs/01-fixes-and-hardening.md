@@ -3,18 +3,21 @@
 Gaps and tech debt in the **existing** code. These are grounded in specific
 files/functions, so they're concrete to pick up.
 
+> **Status: ✅ all items implemented (2026-06-04).** Covered by the test suite in
+> [02-testing-and-qa.md](02-testing-and-qa.md). Details per item below.
+
 | ID | Priority | Effort | Status | Item |
 |----|----------|--------|--------|------|
-| FIX-01 | P0 | S | TODO | Validate payments on checkout |
-| FIX-02 | P0 | S | TODO | Block selling inactive / unpriced products |
-| FIX-03 | P1 | S | TODO | Reject non-positive quantities & costs |
-| FIX-04 | P1 | S | TODO | Healthcheck endpoint for `web` |
-| FIX-05 | P1 | M | TODO | Paginate report endpoints |
-| FIX-06 | P2 | S | TODO | Friendly 400 when deleting referenced records |
-| FIX-07 | P2 | S | TODO | Consistent activity logging coverage |
-| FIX-08 | P2 | S | TODO | Receipt-number format & concurrency review |
-| FIX-09 | P2 | M | TODO | Standardize the API error envelope |
-| FIX-10 | P3 | S | TODO | Decimal rounding/quantization review |
+| FIX-01 | P0 | S | ✅ DONE | Validate payments on checkout |
+| FIX-02 | P0 | S | ✅ DONE | Block selling inactive / unpriced products |
+| FIX-03 | P1 | S | ✅ DONE | Reject non-positive quantities & costs |
+| FIX-04 | P1 | S | ✅ DONE | Healthcheck endpoint for `web` |
+| FIX-05 | P1 | M | ✅ DONE | Paginate report endpoints |
+| FIX-06 | P2 | S | ✅ DONE | Friendly 400 when deleting referenced records |
+| FIX-07 | P2 | S | ✅ DONE | Consistent activity logging coverage |
+| FIX-08 | P2 | S | ✅ DONE | Receipt-number format & concurrency review |
+| FIX-09 | P2 | M | ✅ DONE | Standardize the API error envelope |
+| FIX-10 | P3 | S | ✅ DONE | Decimal rounding/quantization review |
 
 ---
 

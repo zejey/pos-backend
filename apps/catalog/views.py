@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.accounts.services import log_activity
+from apps.common.mixins import ActivityLogMixin
 from apps.common.permissions import IsAdminOrReadOnly
 
 from .models import Category, Product
@@ -13,7 +14,7 @@ from .serializers import (
 )
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
+class CategoryViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
@@ -21,7 +22,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     search_fields = ["name"]
 
 
-class ProductViewSet(viewsets.ModelViewSet):
+class ProductViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     """Product master data. Cashiers read; Admins manage."""
 
     queryset = Product.objects.select_related("category").all()

@@ -172,3 +172,6 @@ CORS_ALLOW_ALL_ORIGINS = DEBUG and not CORS_ALLOWED_ORIGINS
 # historical receipts. Set POS_TAX_RATE=0 to disable tax entirely.
 POS_TAX_RATE = Decimal(os.environ.get("POS_TAX_RATE", "12"))  # percent
 POS_TAX_LABEL = os.environ.get("POS_TAX_LABEL", "VAT")
+
+# Receipt number prefix (e.g. a per-store code). Format: {PREFIX}{YYYYMMDD}-{id}.
+POS_RECEIPT_PREFIX = os.environ.get("POS_RECEIPT_PREFIX", "R")

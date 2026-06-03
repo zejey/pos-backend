@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.accounts.services import log_activity
+from apps.common.mixins import ActivityLogMixin
 from apps.common.permissions import IsAdmin
 
 from .models import StockIn, Supplier
@@ -10,7 +11,7 @@ from .serializers import StockInSerializer, SupplierSerializer
 from .services import post_stock_in
 
 
-class SupplierViewSet(viewsets.ModelViewSet):
+class SupplierViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     """Suppliers / vendors. Admin only."""
 
     queryset = Supplier.objects.all()

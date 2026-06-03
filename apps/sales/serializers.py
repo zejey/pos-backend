@@ -22,9 +22,27 @@ class SaleItemSerializer(serializers.ModelSerializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    amount = serializers.DecimalField(
+        max_digits=14, decimal_places=2, min_value=Decimal("0.01")
+    )
+    tendered = serializers.DecimalField(
+        max_digits=14, decimal_places=2, min_value=Decimal("0.00"), required=False
+    )
+
     class Meta:
         model = Payment
         fields = ["id", "method", "amount", "tendered", "reference"]
+
+    def validate(self, attrs):
+        # For cash, the tendered amount must at least cover the payment so
+        # change can be computed; non-cash methods don't require tender.
+        if attrs.get("method") == Payment.Method.CASH:
+            tendered = attrs.get("tendered") or Decimal("0.00")
+            if tendered < attrs["amount"]:
+                raise serializers.ValidationError(
+                    "Cash tendered must be at least the payment amount."
+                )
+        return attrs
 
 
 class CartItemInputSerializer(serializers.Serializer):

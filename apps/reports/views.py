@@ -11,6 +11,7 @@ from django.db.models import (
     DecimalField,
     ExpressionWrapper,
     F,
+    Q,
     Sum,
 )
 from django.db.models.functions import Coalesce
@@ -20,6 +21,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalog.models import Product
+from apps.common.pagination import DefaultPagination
 from apps.common.permissions import IsAdmin
 from apps.purchasing.models import StockIn
 from apps.sales.models import Sale, SaleItem
@@ -88,6 +90,7 @@ class TopProductsReport(APIView):
             limit = int(request.query_params.get("limit", 10))
         except ValueError:
             limit = 10
+        limit = max(1, min(limit, 100))  # bound the result size
 
         rows = (
             SaleItem.objects.filter(
@@ -110,26 +113,40 @@ class InventoryStatusReport(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        products = Product.objects.filter(is_active=True).select_related("category")
-        items, total_value, low_count = [], ZERO, 0
-        for p in products:
-            value = p.stock_value
-            total_value += value
-            low = p.is_low_stock
-            low_count += 1 if low else 0
-            items.append({
-                "id": p.id, "sku": p.sku, "name": p.name,
-                "quantity_on_hand": p.quantity_on_hand,
-                "reorder_level": p.reorder_level,
-                "is_low_stock": low,
-                "stock_value": value,
-            })
-        return Response({
-            "product_count": len(items),
-            "low_stock_count": low_count,
-            "total_stock_value": total_value,
-            "results": items,
-        })
+        qs = (
+            Product.objects.filter(is_active=True)
+            .select_related("category")
+            .annotate(
+                value=ExpressionWrapper(
+                    F("quantity_on_hand") * F("cost_price"), output_field=MONEY
+                ),
+            )
+            .order_by("quantity_on_hand")
+        )
+        # Summary totals span the WHOLE catalog (not just the current page).
+        totals = qs.aggregate(
+            product_count=Count("id"),
+            total_stock_value=Coalesce(Sum("value"), ZERO),
+            low_stock_count=Count(
+                "id", filter=Q(quantity_on_hand__lte=F("reorder_level"))
+            ),
+        )
+
+        paginator = DefaultPagination()
+        page = paginator.paginate_queryset(qs, request, view=self)
+        items = [{
+            "id": p.id, "sku": p.sku, "name": p.name,
+            "quantity_on_hand": p.quantity_on_hand,
+            "reorder_level": p.reorder_level,
+            "is_low_stock": p.quantity_on_hand <= p.reorder_level,
+            "stock_value": p.value,
+        } for p in page]
+
+        response = paginator.get_paginated_response(items)
+        response.data["product_count"] = totals["product_count"]
+        response.data["low_stock_count"] = totals["low_stock_count"]
+        response.data["total_stock_value"] = totals["total_stock_value"]
+        return response
 
 
 class StockInHistoryReport(APIView):

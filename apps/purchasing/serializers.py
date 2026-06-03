@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import StockIn, StockInItem, Supplier
@@ -14,6 +16,15 @@ class SupplierSerializer(serializers.ModelSerializer):
 
 class StockInItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    quantity_ordered = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.01")
+    )
+    quantity_received = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00")
+    )
+    unit_cost = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.00")
+    )
     discrepancy_qty = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
     )
