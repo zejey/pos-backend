@@ -211,3 +211,50 @@ class ProfitEstimateReport(APIView):
             "estimated_cogs": cogs,
             "estimated_profit": (revenue - cogs),
         })
+
+
+class DashboardReport(APIView):
+    """One-call KPI snapshot for the dashboard (FEAT-12).
+
+    Bundles today's sales, low-stock count, and today's top item so the
+    frontend dashboard loads with a single request instead of several.
+    """
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        today = timezone.localdate()
+        todays_sales = Sale.objects.filter(
+            status=Sale.Status.COMPLETED, completed_at__date=today
+        )
+        sales_agg = todays_sales.aggregate(
+            transactions=Count("id"),
+            gross_sales=Coalesce(Sum("total"), ZERO),
+            total_tax=Coalesce(Sum("tax_amount"), ZERO),
+        )
+        low_stock_count = Product.objects.filter(
+            is_active=True, quantity_on_hand__lte=F("reorder_level")
+        ).count()
+        top = (
+            SaleItem.objects.filter(
+                sale__status=Sale.Status.COMPLETED, sale__completed_at__date=today
+            )
+            .values("product", "product__name")
+            .annotate(quantity_sold=Coalesce(Sum("quantity"), ZERO))
+            .order_by("-quantity_sold")
+            .first()
+        )
+        return Response({
+            "date": today,
+            "today": {
+                "transactions": sales_agg["transactions"],
+                "gross_sales": sales_agg["gross_sales"],
+                "total_tax": sales_agg["total_tax"],
+            },
+            "low_stock_count": low_stock_count,
+            "top_item": {
+                "product": top["product"],
+                "name": top["product__name"],
+                "quantity_sold": top["quantity_sold"],
+            } if top else None,
+        })

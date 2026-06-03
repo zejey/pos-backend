@@ -50,3 +50,22 @@ class ProductViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             {"created": len(created),
              "products": ProductSerializer(created, many=True).data}
         )
+
+    @action(detail=False, methods=["get"], url_path="by-barcode")
+    def by_barcode(self, request):
+        """Look up a single active product by exact barcode (FEAT-04).
+
+        Powers fast cashier scanning: GET /catalog/products/by-barcode/?barcode=...
+        """
+        barcode = request.query_params.get("barcode", "").strip()
+        if not barcode:
+            return Response({"detail": "A 'barcode' query parameter is required.",
+                             "code": "required"}, status=400)
+        product = (
+            Product.objects.filter(barcode=barcode, is_active=True)
+            .select_related("category").first()
+        )
+        if product is None:
+            return Response({"detail": "No active product with that barcode.",
+                             "code": "not_found"}, status=404)
+        return Response(ProductSerializer(product).data)

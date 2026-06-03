@@ -11,7 +11,7 @@ the professor confirms as the target business.
 | FEAT-01 | P1 | M | TODO | Returns / refunds (partial), distinct from full void |
 | FEAT-02 | P2 | M | TODO | Per-line item discounts (currently order-level only) |
 | FEAT-03 | P1 | M | TODO | Shift / cash-drawer management (open/close, X & Z reports) |
-| FEAT-04 | P2 | S | TODO | Barcode lookup endpoint (`GET /catalog/products/by-barcode/`) |
+| FEAT-04 | P2 | S | ✅ DONE | Barcode lookup endpoint (`GET /catalog/products/by-barcode/`) |
 | FEAT-05 | P2 | S | TODO | Parked/held sales: list & resume open drafts |
 
 - **FEAT-01** Refunds: a `Return` referencing a sale + items; re-adds stock via a
@@ -47,7 +47,7 @@ the professor confirms as the target business.
 
 | ID | Priority | Effort | Status | Item |
 |----|----------|--------|--------|------|
-| FEAT-12 | P1 | S | TODO | Dashboard KPI endpoint (today's sales, low-stock count, top item — one call) |
+| FEAT-12 | P1 | S | ✅ DONE | Dashboard KPI endpoint (`GET /reports/dashboard/`) — today's sales, low-stock count, top item in one call |
 | FEAT-13 | P1 | M | TODO | Report export (CSV first, PDF later) |
 | FEAT-14 | P2 | M | TODO | Low-stock notifications (email or websocket), beyond the list endpoint |
 
