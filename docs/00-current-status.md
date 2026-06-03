@@ -19,7 +19,7 @@ record; all movements traceable.* Do not add code paths that write
 
 | Core feature | Status | Notes |
 |---|---|---|
-| **User Management** | ✅ | Admin/Cashier roles, JWT login + refresh, activity log. Logout is client-side only (see `SEC-03`). |
+| **User Management** | ✅ | Admin/Cashier roles, JWT login + refresh + **server-side logout** (blacklist), activity log (now covers all admin CRUD). |
 | **Product catalog** | ✅ | Products, categories, bulk entry. `quantity_on_hand` read-only. |
 | **Inventory** | ✅ | Ledger, auto-deduction, low-stock endpoint, manual adjustment w/ mandatory reason. |
 | **Stock-in / Purchasing** | ✅ | Draft → post, reference no., discrepancy handling, cost refresh, audit trail. `supplier` is now a `Supplier` FK (was free text — `FEAT-08`). |
@@ -40,9 +40,17 @@ record; all movements traceable.* Do not add code paths that write
 | reports | `apps/reports/` | read-only analytics |
 | common | `apps/common/` | base model, permissions, pagination, exceptions |
 
-## Known explicit gaps (detailed in later modules)
+## Progress (2026-06-04)
 
-- No automated test suite yet → [02](02-testing-and-qa.md)
-- A handful of input-validation holes → [01](01-fixes-and-hardening.md)
-- Not production-hardened (DEBUG, CORS, static, secrets) → [04](04-security-and-production.md)
-- Several real-world POS features not built (refunds, tax, shifts) → [03](03-feature-enhancements.md)
+- ✅ **Module 01** (fixes & hardening) — all 10 FIX items done.
+- ✅ **Module 02** (testing) — 34 tests, ~84% coverage, CI workflow.
+- ✅ **Module 04** (security/prod) — SEC-01–08 done; SEC-09 partial.
+- ◑ **Module 03** (features) — VAT tax (inclusive), Suppliers, dashboard KPI
+  (FEAT-12) and barcode lookup (FEAT-04) done; the rest remain business-type
+  dependent → [03](03-feature-enhancements.md).
+
+## Remaining gaps
+
+- Real-world POS features still open (refunds, shifts, VAT-exclusive,
+  multi-location) — hold until the target business is confirmed → [03](03-feature-enhancements.md).
+- `django-axes` login lockout not added (login throttle is in place) → `SEC-09`.

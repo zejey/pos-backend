@@ -4,7 +4,12 @@ Everything from the other modules, prioritized and sequenced. **Start at the
 top.** Phases map to the project's remaining sprints; within a phase, do P0
 before P1.
 
-## Phase 1 — Make it trustworthy (before the demo / submission)
+> **Update (2026-06-04):** Phase 1 is complete, and much of Phase 2 landed early
+> — all of Module 01 (fixes), Module 02 (tests + CI), Module 04 SEC-01–08
+> (security/prod), plus FEAT-12 (dashboard) and FEAT-04 (barcode). Remaining
+> Phase 2/3 work is the business-type-dependent features.
+
+## Phase 1 — Make it trustworthy (before the demo / submission) ✅
 The goal: the core flow is correct, safe, and provable. Highest grading impact
 (functionality + completeness).
 

@@ -193,7 +193,7 @@ Every Core Feature from the brief → where it's implemented. Useful for the
 | Brief requirement | Implemented in |
 |---|---|
 | Role-based access (Admin / Cashier) | `User.role` + `IsAdmin` / `IsAdminOrReadOnly` (`apps/common/permissions.py`) |
-| Login / Logout | `POST /auth/login/`, `POST /auth/refresh/` (JWT; logout is client-side token discard) |
+| Login / Logout | `POST /auth/login/`, `POST /auth/refresh/`, `POST /auth/logout/` (JWT; logout blacklists the refresh token) |
 | Activity logging | `ActivityLog` + `log_activity()` (`apps/accounts/services.py`) |
 
 ### Reports & Analytics
@@ -204,6 +204,9 @@ Every Core Feature from the brief → where it's implemented. Useful for the
 | Inventory status report | `GET /reports/inventory-status/` |
 | Stock-in (purchase) history | `GET /reports/stock-in-history/` |
 | Basic profit estimation | `GET /reports/profit-estimate/` |
+| Dashboard KPIs (one call) | `GET /reports/dashboard/` (FEAT-12) |
+| Barcode lookup | `GET /catalog/products/by-barcode/` (FEAT-04) |
+| Health check | `GET /api/health/` (FIX-04) |
 
 ### Pricing & Discounts
 | Brief requirement | Implemented in |

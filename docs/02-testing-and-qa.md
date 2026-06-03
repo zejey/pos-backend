@@ -6,15 +6,24 @@ the QA team's deliverables (Test Cases, Test Results).
 
 ## Setup
 
+> **Status: ✅ implemented (2026-06-04).** 34 tests in `tests/`, ~84% coverage
+> overall (92% on `apps/sales/services.py`). Run with `pytest`; config in
+> `pytest.ini` + `config/settings_test.py` (in-memory sqlite). Dev deps in
+> `requirements-dev.txt`.
+
 | ID | Priority | Effort | Status | Item |
 |----|----------|--------|--------|------|
-| TEST-00 | P0 | S | TODO | Add pytest + pytest-django + a factories lib (`model-bakery`) |
-| TEST-01 | P0 | M | TODO | Controlled-flow happy-path tests |
-| TEST-02 | P0 | M | TODO | Edge-case & failure tests |
-| TEST-03 | P1 | M | TODO | Permission matrix tests (Admin vs Cashier) |
-| TEST-04 | P1 | S | TODO | Reports correctness tests |
-| TEST-05 | P2 | S | TODO | API contract / schema test |
-| TEST-06 | P2 | M | TODO | CI pipeline (GitHub Actions) |
+| TEST-00 | P0 | S | ✅ DONE | pytest + pytest-django + model-bakery + pytest-cov |
+| TEST-01 | P0 | M | ✅ DONE | Controlled-flow happy-path tests (`tests/test_controlled_flow.py`) |
+| TEST-02 | P0 | M | ✅ DONE | Edge-case & failure tests (`tests/test_edge_cases.py`) |
+| TEST-03 | P1 | M | ✅ DONE | Permission matrix tests (`tests/test_permissions.py`) |
+| TEST-04 | P1 | S | ✅ DONE | Reports correctness tests (`tests/test_reports.py`) |
+| TEST-05 | P2 | S | ✅ DONE | Schema/contract + health (`tests/test_schema_and_health.py`) |
+| TEST-06 | P2 | M | ✅ DONE | CI pipeline (`.github/workflows/ci.yml`) |
+
+> Note: the concurrent-last-unit test (TEST-02) is meaningful only on Postgres;
+> the suite runs on sqlite, where `select_for_update` is a no-op. Run that case
+> against Postgres in CI if you want true concurrency coverage.
 
 ## TEST-00 — Tooling
 Add to `requirements-dev.txt`: `pytest`, `pytest-django`, `model-bakery`,
