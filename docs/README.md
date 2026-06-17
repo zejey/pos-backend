@@ -16,7 +16,9 @@ work with IDs you can reference in commits, sprint backlogs, and standups.
 | [05-deployment-guide.md](05-deployment-guide.md) | Deployment Guide | The graded deployment-guide deliverable |
 | [06-documentation-deliverables.md](06-documentation-deliverables.md) | Doc Deliverables | Mapping the brief's required docs to tasks (`DOC-xx`) |
 | [07-roadmap.md](07-roadmap.md) | Roadmap | Everything above, prioritized and sequenced into phases |
-| [08-usage-guide.md](08-usage-guide.md) | Usage Guide | Command & API reference: what to run (CLI) and what to call (endpoints) |
+
+> **Usage guide** (CLI commands + API operations) now lives in the top-level
+> [../README.md](../README.md).
 
 ## Reference (the system as it is)
 
