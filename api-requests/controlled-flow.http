@@ -1,0 +1,374 @@
+###############################################################################
+# POS & Inventory — End-to-End API Workflow
+#
+# Walks the brief's controlled flow as a clickable, chained sequence:
+#   LOGIN -> STOCK-IN -> INVENTORY UPDATE -> POS SALE -> REPORTS
+#
+# HOW TO USE (VS Code):
+#   1. Install the "REST Client" extension (humao.rest-client).
+#   2. Start the API:  python manage.py runserver   (and `seed_demo` once).
+#   3. Pick an environment below via the status-bar env switcher, or just use
+#      the default @baseUrl.
+#   4. Run requests top-to-bottom by clicking "Send Request" above each one.
+#      Tokens and IDs are captured automatically from earlier responses, so the
+#      whole flow chains without copy-pasting.
+#
+# This file is also the script for the DOC-06 system-demo video.
+###############################################################################
+
+@baseUrl = http://localhost:8000/api
+@contentType = application/json
+
+# Seed credentials (from `python manage.py seed_demo`).
+@adminUser = admin
+@adminPass = admin123
+@cashierUser = cashier
+@cashierPass = cashier123
+
+
+### 0. Health check — API is up -------------------------------------------------
+GET {{baseUrl}}/health/
+
+
+### 1. Login as ADMIN -----------------------------------------------------------
+# @name adminLogin
+POST {{baseUrl}}/auth/login/
+Content-Type: {{contentType}}
+
+{
+  "username": "{{adminUser}}",
+  "password": "{{adminPass}}"
+}
+
+# Captured for every admin request below:
+@adminToken = {{adminLogin.response.body.access}}
+@adminRefresh = {{adminLogin.response.body.refresh}}
+
+
+### 2. Login as CASHIER (used for the POS sale, to show role-based access) ------
+# @name cashierLogin
+POST {{baseUrl}}/auth/login/
+Content-Type: {{contentType}}
+
+{
+  "username": "{{cashierUser}}",
+  "password": "{{cashierPass}}"
+}
+
+@cashierToken = {{cashierLogin.response.body.access}}
+@cashierRefresh = {{cashierLogin.response.body.refresh}}
+
+
+### 3. Who am I? (current cashier profile) --------------------------------------
+GET {{baseUrl}}/auth/users/me/
+Authorization: Bearer {{cashierToken}}
+
+
+# =============================================================================
+#  CATALOG  — create a product to sell  (admin only)
+# =============================================================================
+
+### 4. Create a category --------------------------------------------------------
+# @name createCategory
+POST {{baseUrl}}/catalog/categories/
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Demo Beverages",
+  "description": "Created by the workflow file"
+}
+
+@categoryId = {{createCategory.response.body.id}}
+
+
+### 5. Create a product (starts at 0 stock — stock comes via stock-in) ----------
+# @name createProduct
+POST {{baseUrl}}/catalog/products/
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "sku": "DEMO-001",
+  "barcode": "4800000000017",
+  "name": "Demo Iced Coffee",
+  "category": {{categoryId}},
+  "unit": "pc",
+  "cost_price": "20.00",
+  "selling_price": "45.00",
+  "reorder_level": "10"
+}
+
+@productId = {{createProduct.response.body.id}}
+
+
+### 6. (Cashier UX) look the product up by barcode — fast scanning --------------
+GET {{baseUrl}}/catalog/products/by-barcode/?barcode=4800000000017
+Authorization: Bearer {{cashierToken}}
+
+
+### 7. (Optional) bulk product entry — Inventory 1.6 ----------------------------
+POST {{baseUrl}}/catalog/products/batch/
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "products": [
+    {"sku": "DEMO-002", "name": "Demo Muffin", "cost_price": "12.00", "selling_price": "30.00", "reorder_level": "5"},
+    {"sku": "DEMO-003", "name": "Demo Cookie", "cost_price": "6.00", "selling_price": "15.00", "reorder_level": "5"}
+  ]
+}
+
+
+# =============================================================================
+#  STOCK-IN  — the start of the controlled flow  (admin only)
+# =============================================================================
+
+### 8. Create a supplier --------------------------------------------------------
+# @name createSupplier
+POST {{baseUrl}}/purchasing/suppliers/
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Demo Workflow Supplier",
+  "contact_person": "Juan dela Cruz",
+  "contact_no": "0917-000-0000"
+}
+
+@supplierId = {{createSupplier.response.body.id}}
+
+
+### 9. Create a DRAFT stock-in document (50 units, no inventory change yet) ------
+# @name createStockIn
+POST {{baseUrl}}/purchasing/stock-ins/
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "reference_no": "DEMO-PO-0001",
+  "supplier": {{supplierId}},
+  "purchase_date": "2026-06-15",
+  "note": "Workflow demo stock-in",
+  "items": [
+    {
+      "product": {{productId}},
+      "quantity_ordered": "50",
+      "quantity_received": "50",
+      "unit_cost": "20.00"
+    }
+  ]
+}
+
+@stockInId = {{createStockIn.response.body.id}}
+
+
+### 10. POST the stock-in — THIS is what raises inventory -----------------------
+POST {{baseUrl}}/purchasing/stock-ins/{{stockInId}}/post_document/
+Authorization: Bearer {{adminToken}}
+
+
+### 11. Confirm inventory rose (quantity_on_hand should now be 50) --------------
+GET {{baseUrl}}/catalog/products/{{productId}}/
+Authorization: Bearer {{adminToken}}
+
+
+# =============================================================================
+#  POS SALE  — cart -> pay -> deduct stock -> receipt
+# =============================================================================
+
+### 12. (Optional) create an order-level discount to apply ----------------------
+# @name createDiscount
+POST {{baseUrl}}/pricing/discounts/
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Demo 10% Off",
+  "discount_type": "PERCENTAGE",
+  "value": "10",
+  "is_active": true
+}
+
+@discountId = {{createDiscount.response.body.id}}
+
+
+### 13. Create a sale (cart) as the CASHIER -------------------------------------
+# Buys 3 units. `cart` prices are snapshotted; tax_rate is snapshotted too.
+# @name createSale
+POST {{baseUrl}}/sales/sales/
+Authorization: Bearer {{cashierToken}}
+Content-Type: {{contentType}}
+
+{
+  "discount": {{discountId}},
+  "note": "Workflow demo sale",
+  "cart": [
+    {"product": {{productId}}, "quantity": "3"}
+  ]
+}
+
+@saleId = {{createSale.response.body.id}}
+
+
+### 14. (Alternative to cart) replace the cart items on an existing draft -------
+POST {{baseUrl}}/sales/sales/{{saleId}}/set_items/
+Authorization: Bearer {{cashierToken}}
+Content-Type: {{contentType}}
+
+[
+  {"product": {{productId}}, "quantity": "3"}
+]
+
+
+### 15. Inspect the draft total before paying (see subtotal/discount/VAT) -------
+GET {{baseUrl}}/sales/sales/{{saleId}}/
+Authorization: Bearer {{cashierToken}}
+
+
+### 16. Complete the sale — take CASH payment, deduct stock, issue receipt ------
+# Total for 3 x 45.00 less 10% = 121.50 (VAT-inclusive). Tender 200.00.
+POST {{baseUrl}}/sales/sales/{{saleId}}/complete/
+Authorization: Bearer {{cashierToken}}
+Content-Type: {{contentType}}
+
+{
+  "payments": [
+    {"method": "CASH", "amount": "121.50", "tendered": "200.00"}
+  ]
+}
+
+
+### 17. Print receipt (POS 1.5) -------------------------------------------------
+GET {{baseUrl}}/sales/sales/{{saleId}}/receipt/
+Authorization: Bearer {{cashierToken}}
+
+
+### 18. Confirm stock fell (quantity_on_hand should now be 47) ------------------
+GET {{baseUrl}}/catalog/products/{{productId}}/
+Authorization: Bearer {{adminToken}}
+
+
+### 19. Today's sales total (POS 1.6 daily tracking) ----------------------------
+GET {{baseUrl}}/sales/sales/daily_summary/
+Authorization: Bearer {{cashierToken}}
+
+
+# =============================================================================
+#  INVENTORY  — low-stock, manual adjustment, audit ledger
+# =============================================================================
+
+### 20. Low-stock alert list (Inventory 1.4) -----------------------------------
+GET {{baseUrl}}/inventory/movements/low_stock/
+Authorization: Bearer {{adminToken}}
+
+
+### 21. Manual stock adjustment with mandatory reason (Inventory 1.5) -----------
+# e.g. 2 units found damaged. `delta` is signed; `reason` is required.
+POST {{baseUrl}}/inventory/movements/adjust/
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "product": {{productId}},
+  "delta": "-2",
+  "reason": "2 units damaged in storage (workflow demo)"
+}
+
+
+### 22. Inventory audit trail — every movement for this product ----------------
+# Should show: STOCK_IN (+50), SALE (-3), ADJUSTMENT (-2), balance after each.
+GET {{baseUrl}}/inventory/movements/?product={{productId}}
+Authorization: Bearer {{adminToken}}
+
+
+# =============================================================================
+#  REPORTS & ANALYTICS  (admin only)
+# =============================================================================
+
+### 23. Dashboard KPI snapshot (one-call) --------------------------------------
+GET {{baseUrl}}/reports/dashboard/
+Authorization: Bearer {{adminToken}}
+
+### 24. Sales summary — daily / weekly / monthly (Reports 1.1) -----------------
+GET {{baseUrl}}/reports/sales-summary/?period=daily
+Authorization: Bearer {{adminToken}}
+
+### 25. Top-selling products (Reports 1.2) -------------------------------------
+GET {{baseUrl}}/reports/top-products/?limit=10
+Authorization: Bearer {{adminToken}}
+
+### 26. Inventory status report (Reports 1.3) ----------------------------------
+GET {{baseUrl}}/reports/inventory-status/
+Authorization: Bearer {{adminToken}}
+
+### 27. Stock-in / purchase history (Reports 1.4) ------------------------------
+GET {{baseUrl}}/reports/stock-in-history/?start=2026-06-01&end=2026-06-30
+Authorization: Bearer {{adminToken}}
+
+### 28. Basic profit estimation (Reports 1.5) ---------------------------------
+GET {{baseUrl}}/reports/profit-estimate/?start=2026-06-01&end=2026-06-30
+Authorization: Bearer {{adminToken}}
+
+
+# =============================================================================
+#  USER MANAGEMENT & AUDIT
+# =============================================================================
+
+### 29. Activity log — who did what (User Management 1.3) ----------------------
+GET {{baseUrl}}/auth/activity/
+Authorization: Bearer {{adminToken}}
+
+
+# =============================================================================
+#  NEGATIVE / EDGE CASES  — prove the rules hold
+# =============================================================================
+
+### 30. Cashier CANNOT void a sale (admin-only) -> expect 403 -------------------
+POST {{baseUrl}}/sales/sales/{{saleId}}/void/
+Authorization: Bearer {{cashierToken}}
+Content-Type: {{contentType}}
+
+{ "reason": "cashier should not be allowed" }
+
+
+### 31. Cashier CANNOT read reports (admin-only) -> expect 403 ------------------
+GET {{baseUrl}}/reports/dashboard/
+Authorization: Bearer {{cashierToken}}
+
+
+### 32. Oversell is rejected -> expect 400 (not enough stock) -------------------
+# Create a draft then try to buy way more than on hand.
+# @name oversellSale
+POST {{baseUrl}}/sales/sales/
+Authorization: Bearer {{cashierToken}}
+Content-Type: {{contentType}}
+
+{ "cart": [ {"product": {{productId}}, "quantity": "9999"} ] }
+
+###
+POST {{baseUrl}}/sales/sales/{{oversellSale.response.body.id}}/complete/
+Authorization: Bearer {{cashierToken}}
+Content-Type: {{contentType}}
+
+{ "payments": [ {"method": "CASH", "amount": "500000.00", "tendered": "500000.00"} ] }
+
+
+# =============================================================================
+#  ADMIN: void the real sale (returns stock) + logout
+# =============================================================================
+
+### 33. Admin voids the completed sale — items return to stock ------------------
+POST {{baseUrl}}/sales/sales/{{saleId}}/void/
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{ "reason": "Workflow demo — reversing the test sale" }
+
+
+### 34. Logout (blacklist the refresh token) -----------------------------------
+POST {{baseUrl}}/auth/logout/
+Authorization: Bearer {{cashierToken}}
+Content-Type: {{contentType}}
+
+{ "refresh": "{{cashierRefresh}}" }
