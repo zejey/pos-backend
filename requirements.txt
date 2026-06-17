@@ -11,6 +11,13 @@ django-cors-headers~=4.6
 django-filter~=24.3
 drf-spectacular~=0.28.0
 
+# Required by DRF's test client (rest_framework.test imports `requests` at
+# module load, pulled in via conftest.py and drf-spectacular). Pinned
+# explicitly because a missing `requests`/`urllib3` stops the server from
+# starting and breaks pytest collection.
+requests~=2.32
+urllib3~=2.0
+
 # Production server
 gunicorn~=23.0
 whitenoise~=6.8
