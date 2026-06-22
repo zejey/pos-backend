@@ -113,11 +113,12 @@ class ReceiptSerializer(serializers.ModelSerializer):
     change_due = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     net_of_tax = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     tax_label = serializers.SerializerMethodField()
+    date = serializers.SerializerMethodField()
 
     class Meta:
         model = Sale
         fields = [
-            "receipt_no", "cashier", "completed_at",
+            "receipt_no", "cashier", "completed_at", "date",
             "items", "subtotal", "discount_total", "total",
             "tax_label", "tax_rate", "tax_amount", "net_of_tax",
             "payments", "amount_paid", "change_due",
@@ -125,3 +126,9 @@ class ReceiptSerializer(serializers.ModelSerializer):
 
     def get_tax_label(self, obj):
         return settings.POS_TAX_LABEL
+
+    def get_date(self, obj):
+        """Return the receipt date (from completed_at)."""
+        if obj.completed_at:
+            return obj.completed_at.date()
+        return None
