@@ -56,6 +56,7 @@ pip install -r requirements.txt
 
 # Point at your PostgreSQL (or use SQLite for a quick look):
 export POS_DB_ENGINE=sqlite            # omit to use PostgreSQL via .env
+$env:POS_DB_ENGINE="sqlite" # for Windows users
 
 python manage.py migrate
 python manage.py seed_demo
