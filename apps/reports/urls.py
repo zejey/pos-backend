@@ -7,6 +7,8 @@ from .views import (
     SalesSummaryReport,
     StockInHistoryReport,
     TopProductsReport,
+    InventoryTurnoverReport,
+    ReorderPointReport
 )
 
 urlpatterns = [
@@ -16,4 +18,6 @@ urlpatterns = [
     path("inventory-status/", InventoryStatusReport.as_view(), name="report-inventory-status"),
     path("stock-in-history/", StockInHistoryReport.as_view(), name="report-stock-in-history"),
     path("profit-estimate/", ProfitEstimateReport.as_view(), name="report-profit-estimate"),
+    path("inventory-turnover/", InventoryTurnoverReport.as_view(), name="report-inventory-turnover"),
+    path("reorder-point/", ReorderPointReport.as_view(), name="report-reorder-point"),
 ]

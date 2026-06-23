@@ -4,7 +4,8 @@ All figures are derived from the same source data the controlled flow records,
 so reports are always consistent with the ledger.
 """
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
+
 
 from django.db.models import (
     Count,
@@ -27,6 +28,7 @@ from apps.purchasing.models import StockIn
 from apps.sales.models import Sale, SaleItem
 
 ZERO = Decimal("0.00")
+TWO_DP = Decimal("0.01")
 MONEY = DecimalField(max_digits=16, decimal_places=2)
 
 
@@ -258,3 +260,269 @@ class DashboardReport(APIView):
                 "quantity_sold": top["quantity_sold"],
             } if top else None,
         })
+
+class InventoryTurnoverReport(APIView):
+    """Inventory turnover rate per product for a given date range.
+ 
+    Formula
+    -------
+    Turnover Rate = COGS (units sold * cost_price) / Average Inventory Value
+ 
+    Average Inventory Value is approximated as:
+        (opening_stock_value + closing_stock_value) / 2
+ 
+    where:
+      - closing stock value  = quantity_on_hand * cost_price  (right now)
+      - opening stock value  = (quantity_on_hand + net_sold_in_period) * cost_price
+ 
+    This is the standard retail approximation. It deliberately uses the
+    *current* cost_price for both sides so the ratio is internally consistent
+    (same limitation as ProfitEstimateReport — not audited FIFO/WACC).
+ 
+    Query params
+    ------------
+    start, end : YYYY-MM-DD  — defaults to today
+    limit      : int 1-200   — rows to return, sorted by turnover desc
+ 
+    Response fields (per product)
+    ------------------------------
+    product, sku, name
+    units_sold          — total qty sold in the period
+    cogs                — units_sold * cost_price
+    opening_stock_value — estimated value at period start
+    closing_stock_value — value at period end (current)
+    avg_inventory_value — (open + close) / 2
+    turnover_rate       — cogs / avg_inventory_value  (null if avg == 0)
+    days_to_sell        — period_days / turnover_rate  (null if turnover == 0)
+    """
+ 
+    permission_classes = [IsAdmin]
+ 
+    def get(self, request):
+        start, end = _parse_range(request)
+        try:
+            limit = max(1, min(int(request.query_params.get("limit", 25)), 200))
+        except ValueError:
+            limit = 25
+ 
+        period_days = (end - start).days + 1  # inclusive
+ 
+        # --- units sold per product in the period ---
+        sold_qs = (
+            SaleItem.objects.filter(
+                sale__status=Sale.Status.COMPLETED,
+                sale__completed_at__date__range=(start, end),
+            )
+            .values("product_id")
+            .annotate(units_sold=Coalesce(Sum("quantity"), ZERO, output_field=DecimalField()))
+        )
+        sold_map = {row["product_id"]: row["units_sold"] for row in sold_qs}
+ 
+        # --- active products ---
+        products = (
+            Product.objects.filter(is_active=True)
+            .select_related("category")
+            .only(
+                "id",
+                "sku",
+                "name",
+                "quantity_on_hand",
+                "cost_price",
+                "category",
+            )
+        )
+ 
+        rows = []
+        for p in products:
+            units_sold = sold_map.get(p.id, ZERO)
+            cost = p.cost_price or ZERO
+ 
+            closing_val = (p.quantity_on_hand * cost).quantize(TWO_DP)
+            opening_qty = p.quantity_on_hand + units_sold   # add back what was sold
+            opening_val = (opening_qty * cost).quantize(TWO_DP)
+            avg_val = ((opening_val + closing_val) / 2).quantize(TWO_DP)
+ 
+            cogs = (units_sold * cost).quantize(TWO_DP)
+ 
+            if avg_val and avg_val > 0:
+                turnover = float((cogs / avg_val).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
+                days_to_sell = round(period_days / turnover, 1) if turnover > 0 else None
+            else:
+                turnover = None
+                days_to_sell = None
+ 
+            rows.append({
+                "product": p.id,
+                "sku": p.sku,
+                "name": p.name,
+                "units_sold": units_sold,
+                "cogs": cogs,
+                "opening_stock_value": opening_val,
+                "closing_stock_value": closing_val,
+                "avg_inventory_value": avg_val,
+                "turnover_rate": turnover,
+                "days_to_sell": days_to_sell,
+            })
+ 
+        # Sort by turnover descending (None last)
+        rows.sort(key=lambda r: r["turnover_rate"] if r["turnover_rate"] is not None else -1, reverse=True)
+        rows = rows[:limit]
+ 
+        # --- aggregate summary ---
+        total_cogs = sum(r["cogs"] for r in rows)
+        total_avg_inv = sum(r["avg_inventory_value"] for r in rows)
+        overall_turnover = (
+            float((total_cogs / total_avg_inv).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
+            if total_avg_inv > 0 else None
+        )
+ 
+        return Response({
+            "start": start,
+            "end": end,
+            "period_days": period_days,
+            "summary": {
+                "total_cogs": total_cogs,
+                "total_avg_inventory_value": total_avg_inv,
+                "overall_turnover_rate": overall_turnover,
+            },
+            "results": rows,
+        })
+ 
+ 
+# ---------------------------------------------------------------------------
+# Reorder Point
+# ---------------------------------------------------------------------------
+ 
+class ReorderPointReport(APIView):
+    """Suggested reorder points per product based on actual sales velocity.
+ 
+    Formula
+    -------
+    Reorder Point (ROP) = (Average Daily Demand × Lead Time) + Safety Stock
+ 
+    where:
+      Average Daily Demand = total units sold in the lookback window / lookback_days
+      Lead Time            = lead_time_days param (default 7)
+      Safety Stock         = z_score * std_daily_demand * sqrt(lead_time_days)
+                             — simplified here as a multiplier on avg demand:
+                             safety_stock = avg_daily_demand * lead_time_days * safety_factor
+ 
+      safety_factor        = safety_factor param (default 0.5, i.e. 50 % buffer)
+ 
+    The suggested ROP is rounded up to the nearest whole unit.
+ 
+    Because this project has no per-product lead-time field yet, lead_time_days
+    is a single query-level input. You can add a `lead_time_days` field to
+    Product later and swap the formula to use it per row.
+ 
+    Query params
+    ------------
+    days          : int  — lookback window for demand calculation (default 30)
+    lead_time_days: int  — supplier lead time in days (default 7)
+    safety_factor : float — safety stock multiplier on avg_daily_demand * lead_time (default 0.5)
+    low_stock_only: bool  — if "true", return only products at or below current reorder_level
+ 
+    Response fields (per product)
+    ------------------------------
+    product, sku, name, category
+    quantity_on_hand
+    current_reorder_level       — the value already stored on the product
+    avg_daily_demand            — units/day over the lookback window
+    lead_time_days              — input param echoed back
+    safety_stock                — calculated buffer quantity
+    suggested_reorder_point     — ROP = (avg_daily_demand * lead_time_days) + safety_stock
+    suggested_reorder_qty       — how much to order (Economic Order Qty not modelled; returns
+                                   30-day demand as a sensible default)
+    needs_reorder               — True if quantity_on_hand <= suggested_reorder_point
+    delta_from_current          — suggested_reorder_point - current_reorder_level
+    """
+ 
+    permission_classes = [IsAdmin]
+ 
+    def get(self, request):
+        # --- inputs ---
+        try:
+            lookback_days = max(1, int(request.query_params.get("days", 30)))
+        except ValueError:
+            lookback_days = 30
+ 
+        try:
+            lead_time_days = max(1, int(request.query_params.get("lead_time_days", 7)))
+        except ValueError:
+            lead_time_days = 7
+ 
+        try:
+            safety_factor = max(0.0, float(request.query_params.get("safety_factor", 0.5)))
+        except ValueError:
+            safety_factor = 0.5
+ 
+        low_stock_only = request.query_params.get("low_stock_only", "").lower() == "true"
+ 
+        end = timezone.localdate()
+        start = end - timedelta(days=lookback_days - 1)
+ 
+        # --- sales velocity per product over the lookback window ---
+        sold_qs = (
+            SaleItem.objects.filter(
+                sale__status=Sale.Status.COMPLETED,
+                sale__completed_at__date__range=(start, end),
+            )
+            .values("product_id")
+            .annotate(
+                total_sold=Coalesce(Sum("quantity"), ZERO, output_field=DecimalField()),
+            )
+        )
+        sold_map = {row["product_id"]: row["total_sold"] for row in sold_qs}
+ 
+        products = (
+            Product.objects.filter(is_active=True)
+            .select_related("category")
+        )
+ 
+        rows = []
+        for p in products:
+            total_sold = sold_map.get(p.id, ZERO)
+            avg_daily = (total_sold / lookback_days).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+ 
+            safety_stock = (avg_daily * lead_time_days * Decimal(str(safety_factor))).quantize(TWO_DP, rounding=ROUND_HALF_UP)
+            rop_raw = (avg_daily * lead_time_days) + safety_stock
+            suggested_rop = rop_raw.quantize(TWO_DP, rounding=ROUND_HALF_UP)
+ 
+            # Suggested order qty = 30-day projected demand (simple)
+            suggested_order_qty = (avg_daily * 30).quantize(TWO_DP, rounding=ROUND_HALF_UP)
+ 
+            needs_reorder = p.quantity_on_hand <= suggested_rop
+            delta = (suggested_rop - p.reorder_level).quantize(TWO_DP)
+ 
+            rows.append({
+                "product": p.id,
+                "sku": p.sku,
+                "name": p.name,
+                "category": p.category.name if p.category else None,
+                "quantity_on_hand": p.quantity_on_hand,
+                "current_reorder_level": p.reorder_level,
+                "avg_daily_demand": avg_daily,
+                "lead_time_days": lead_time_days,
+                "safety_stock": safety_stock,
+                "suggested_reorder_point": suggested_rop,
+                "suggested_reorder_qty": suggested_order_qty,
+                "needs_reorder": needs_reorder,
+                "delta_from_current": delta,
+            })
+ 
+        if low_stock_only:
+            rows = [r for r in rows if r["needs_reorder"]]
+ 
+        # Sort: needs_reorder first, then by delta desc (biggest gap first)
+        rows.sort(key=lambda r: (not r["needs_reorder"], -float(r["delta_from_current"])))
+ 
+        reorder_count = sum(1 for r in rows if r["needs_reorder"])
+ 
+        paginator = DefaultPagination()
+        page = paginator.paginate_queryset(rows, request, view=self)
+        response = paginator.get_paginated_response(page)
+        response.data["lookback_days"] = lookback_days
+        response.data["lead_time_days"] = lead_time_days
+        response.data["safety_factor"] = safety_factor
+        response.data["needs_reorder_count"] = reorder_count
+        return response

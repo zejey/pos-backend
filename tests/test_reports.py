@@ -1,6 +1,7 @@
 """TEST-04 — Reports correctness against known seeded data."""
 from decimal import Decimal
-
+from datetime import timedelta
+from django.utils import timezone
 import pytest
 
 from apps.sales.models import Sale
@@ -56,3 +57,94 @@ def test_inventory_status_totals_and_pagination(make_product, admin_api):
     assert Decimal(str(data["total_stock_value"])) == Decimal("60.00")
     assert data["low_stock_count"] == 1
     assert "results" in data and "count" in data  # paginated envelope
+
+class TestInventoryTurnoverReport:
+    """Test the InventoryTurnoverReport endpoint."""
+    
+    def test_turnover_report_basic(self, make_product, admin_api):
+        """Test turnover report returns data with correct structure."""
+        product = make_product(
+            qty=Decimal("100"),
+            price=Decimal("50.00"),
+            cost=Decimal("30.00")  # Use 'cost' not 'cost_price'
+        )
+        sale = Sale.objects.create(tax_rate=current_tax_rate())
+        set_sale_items(sale, [{"product": product.pk, "quantity": Decimal("10")}])
+        complete_sale(sale, [{"method": "CASH", "amount": "500.00", "tendered": "500.00"}])
+        
+        today = timezone.localdate()
+        resp = admin_api.get(
+            f"/api/reports/inventory-turnover/?start={today}&end={today}"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "results" in data
+        assert "summary" in data
+        assert data["summary"]["overall_turnover_rate"] is not None
+    
+    def test_turnover_report_pagination_limit(self, make_product, admin_api):
+        """Test turnover report respects limit parameter."""
+        for i in range(10):
+            product = make_product(
+                qty=Decimal("100"),
+                price=Decimal("50.00"),
+                cost=Decimal("30.00")  # Use 'cost' not 'cost_price'
+            )
+            sale = Sale.objects.create(tax_rate=current_tax_rate())
+            set_sale_items(sale, [{"product": product.pk, "quantity": Decimal("1")}])
+            complete_sale(sale, [{"method": "CASH", "amount": "50.00", "tendered": "50.00"}])
+        
+        today = timezone.localdate()
+        resp = admin_api.get(
+            f"/api/reports/inventory-turnover/?start={today}&end={today}&limit=5"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["results"]) <= 5
+
+
+class TestReorderPointReport:
+    """Test the ReorderPointReport endpoint."""
+    
+    def test_reorder_point_basic(self, make_product, admin_api):
+        """Test reorder point report returns data with correct structure."""
+        product = make_product(
+            qty=Decimal("5"),
+            price=Decimal("50.00")
+            # reorder_level already defaults to Decimal("5.00") in fixture
+        )
+        sale = Sale.objects.create(tax_rate=current_tax_rate())
+        set_sale_items(sale, [{"product": product.pk, "quantity": Decimal("2")}])
+        complete_sale(sale, [{"method": "CASH", "amount": "100.00", "tendered": "100.00"}])
+        
+        resp = admin_api.get("/api/reports/reorder-point/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "results" in data
+        assert "lookback_days" in data
+        assert data["lookback_days"] == 30  # default
+    
+    def test_reorder_point_custom_params(self, make_product, admin_api):
+        """Test reorder point with custom parameters."""
+        product = make_product(qty=Decimal("50"))
+        
+        resp = admin_api.get(
+            "/api/reports/reorder-point/?days=7&lead_time_days=14&safety_factor=0.75"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["lookback_days"] == 7
+        assert data["lead_time_days"] == 14
+        assert data["safety_factor"] == 0.75
+    
+    def test_reorder_point_low_stock_only(self, make_product, admin_api):
+        """Test reorder point filtered for low stock only."""
+        product = make_product(qty=Decimal("5"))
+        # Product already has reorder_level = 5, so qty=5 will trigger needs_reorder
+        
+        resp = admin_api.get("/api/reports/reorder-point/?low_stock_only=true")
+        assert resp.status_code == 200
+        data = resp.json()
+        # All returned products should need reorder
+        for result in data["results"]:
+            assert result["needs_reorder"] is True
