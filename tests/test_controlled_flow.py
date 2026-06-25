@@ -73,6 +73,59 @@ def test_void_returns_stock_and_writes_reversal(make_product):
     assert rev.quantity == Decimal("4.00") and rev.reason == "customer changed mind"
 
 
+def test_admin_can_approve_item_void_request(make_product, cashier_api, admin_api):
+    product = make_product(qty=Decimal("10"))
+    sale = Sale.objects.create(tax_rate=current_tax_rate())
+    set_sale_items(sale, [{"product": product.pk, "quantity": Decimal("3")}])
+    sale_item = sale.items.first()
+
+    resp = cashier_api.post(
+        "/api/sales/item-void-requests/",
+        {"sale_item": sale_item.pk, "quantity": "1", "reason": "wrong item scanned"},
+        format="json",
+    )
+    assert resp.status_code == 201
+    request_id = resp.data["id"]
+
+    approve = admin_api.post(
+        f"/api/sales/item-void-requests/{request_id}/approve/",
+        {"review_note": "approved"},
+        format="json",
+    )
+    assert approve.status_code == 200
+
+    sale.refresh_from_db()
+    sale_item.refresh_from_db()
+    assert sale.status == "DRAFT"
+    assert sale_item.quantity == Decimal("2.00")
+    assert sale_item.line_total == Decimal("200.00")
+
+
+def test_admin_can_deny_item_void_request(make_product, cashier_api, admin_api):
+    product = make_product(qty=Decimal("10"))
+    sale = Sale.objects.create(tax_rate=current_tax_rate())
+    set_sale_items(sale, [{"product": product.pk, "quantity": Decimal("2")}])
+    sale_item = sale.items.first()
+
+    resp = cashier_api.post(
+        "/api/sales/item-void-requests/",
+        {"sale_item": sale_item.pk, "reason": "customer changed mind"},
+        format="json",
+    )
+    assert resp.status_code == 201
+    request_id = resp.data["id"]
+
+    deny = admin_api.post(
+        f"/api/sales/item-void-requests/{request_id}/deny/",
+        {"review_note": "keep item"},
+        format="json",
+    )
+    assert deny.status_code == 200
+
+    sale.refresh_from_db()
+    assert sale.items.count() == 1
+
+
 def test_manual_adjustment_writes_movement_with_reason(make_product):
     product = make_product(qty=Decimal("20"))
     manual_adjustment(product=product, delta=Decimal("-2"), reason="damaged")

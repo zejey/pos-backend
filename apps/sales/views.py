@@ -10,15 +10,24 @@ from rest_framework.response import Response
 from apps.accounts.services import log_activity
 from apps.common.permissions import IsAdmin
 
-from .models import Sale
+from .models import Sale, SaleItem, SaleItemVoidRequest
 from .serializers import (
     CartItemInputSerializer,
     CompleteSaleSerializer,
+    SaleItemVoidRequestCreateSerializer,
+    SaleItemVoidRequestReviewSerializer,
+    SaleItemVoidRequestSerializer,
     ReceiptSerializer,
     SaleSerializer,
     VoidSaleSerializer,
 )
-from .services import complete_sale, set_sale_items, void_sale
+from .services import (
+    approve_item_void_request,
+    complete_sale,
+    deny_item_void_request,
+    set_sale_items,
+    void_sale,
+)
 
 
 class SaleViewSet(viewsets.ModelViewSet):
@@ -91,3 +100,65 @@ class SaleViewSet(viewsets.ModelViewSet):
             "gross_sales": agg["total"] or Decimal("0.00"),
             "total_tax": agg["tax"] or Decimal("0.00"),
         })
+
+
+class SaleItemVoidRequestViewSet(viewsets.ModelViewSet):
+    queryset = SaleItemVoidRequest.objects.all()
+    serializer_class = SaleItemVoidRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = SaleItemVoidRequest.objects.select_related(
+            "sale", "requested_by", "reviewed_by"
+        )
+        if getattr(self.request.user, "is_admin", False):
+            return qs
+        return qs.filter(requested_by=self.request.user)
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return SaleItemVoidRequestCreateSerializer
+        if self.action in {"approve", "deny"}:
+            return SaleItemVoidRequestReviewSerializer
+        return SaleItemVoidRequestSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request_obj = serializer.save()
+        log_activity(self.request.user, "SALE_ITEM_VOID_REQUEST", entity="SaleItemVoidRequest",
+                     entity_id=request_obj.pk, detail={"sale_id": request_obj.sale_id},
+                     request=self.request)
+        output = SaleItemVoidRequestSerializer(request_obj, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=201, headers=headers)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAdmin])
+    def approve(self, request, pk=None):
+        request_obj = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request_obj = approve_item_void_request(
+            request_obj,
+            request.user,
+            review_note=serializer.validated_data.get("review_note", ""),
+        )
+        log_activity(request.user, "SALE_ITEM_VOID_APPROVE", entity="SaleItemVoidRequest",
+                     entity_id=request_obj.pk, detail={"sale_id": request_obj.sale_id},
+                     request=request)
+        return Response(SaleItemVoidRequestSerializer(request_obj).data)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAdmin])
+    def deny(self, request, pk=None):
+        request_obj = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request_obj = deny_item_void_request(
+            request_obj,
+            request.user,
+            review_note=serializer.validated_data.get("review_note", ""),
+        )
+        log_activity(request.user, "SALE_ITEM_VOID_DENY", entity="SaleItemVoidRequest",
+                     entity_id=request_obj.pk, detail={"sale_id": request_obj.sale_id},
+                     request=request)
+        return Response(SaleItemVoidRequestSerializer(request_obj).data)

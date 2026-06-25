@@ -104,3 +104,54 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.method} {self.amount}"
+
+
+class SaleItemVoidRequest(TimeStampedModel):
+    """A cashier request to void a scanned item from a draft sale.
+
+    This is a review workflow, not an inventory reversal. Stock only changes
+    when the draft sale is later completed.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        APPROVED = "APPROVED", "Approved"
+        DENIED = "DENIED", "Denied"
+
+    sale = models.ForeignKey(
+        Sale, on_delete=models.CASCADE, related_name="item_void_requests"
+    )
+    sale_item_id = models.PositiveBigIntegerField()
+    product_sku = models.CharField(max_length=64)
+    product_name = models.CharField(max_length=255)
+    quantity = models.DecimalField(max_digits=12, decimal_places=2)
+    reason = models.CharField(max_length=255)
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PENDING
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sale_item_void_requests",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_sale_item_void_requests",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["sale", "status"]),
+        ]
+
+    def __str__(self):
+        return f"Item void request #{self.pk} ({self.status})"

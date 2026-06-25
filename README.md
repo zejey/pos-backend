@@ -205,8 +205,11 @@ Access tokens expire; get a new one with `POST /api/auth/refresh/`
 |---|---|---|
 | `GET/POST /sales/sales/` · `/{id}/` | Cashier+ | List sales / open a cart (optionally pass `cart` + `discount`). |
 | `POST /sales/sales/{id}/set_items/` | Cashier+ | Replace cart items (`[{"product","quantity"}, ...]`). |
+| `POST /sales/item-void-requests/` | Cashier+ | Request removal of a scanned item from a draft sale (`{"sale_item","quantity"?,"reason"}`). |
+| `POST /sales/item-void-requests/{id}/approve/` | Admin | Approve a pending draft-item void request and remove the line from the draft sale. |
+| `POST /sales/item-void-requests/{id}/deny/` | Admin | Deny a pending draft-item void request. |
 | `POST /sales/sales/{id}/complete/` | Cashier+ | Take payment, deduct stock, issue receipt (`{"payments":[...]}`). |
-| `POST /sales/sales/{id}/void/` | Admin | Void a completed sale, return stock (`{"reason":"..."}`). |
+| `POST /sales/sales/{id}/void/` | Admin | Void a completed sale only, return stock with `SALE_REVERSAL` entries, and require `{"reason":"..."}`. |
 | `GET /sales/sales/{id}/receipt/` | Cashier+ | Receipt payload for printing. |
 | `GET /sales/sales/daily_summary/` | Cashier+ | Today's sales totals. |
 

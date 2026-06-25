@@ -22,6 +22,7 @@ def test_cashier_can_read_products_and_create_sales(cashier_api):
     ("get", "/api/inventory/movements/", None),
     ("get", "/api/reports/sales-summary/", None),
     ("get", "/api/auth/users/", None),
+    ("post", "/api/sales/item-void-requests/1/approve/", {"review_note": "no"}),
 ])
 def test_cashier_is_forbidden_from_admin_endpoints(cashier_api, method, path, body):
     call = getattr(cashier_api, method)

@@ -221,6 +221,39 @@ Content-Type: {{contentType}}
 ]
 
 
+### 14b. Cashier requests void for one scanned draft item ----------------------
+# This is for an unpaid draft sale only.
+# @name draftItemVoidRequest
+POST {{baseUrl}}/sales/item-void-requests/
+Authorization: Bearer {{cashierToken}}
+Content-Type: {{contentType}}
+
+{
+  "sale_item": {{createSale.response.body.items.0.id}},
+  "quantity": "1",
+  "reason": "Wrong item scanned, waiting for admin review"
+}
+
+@draftItemVoidRequestId = {{draftItemVoidRequest.response.body.id}}
+
+
+### 14c. Admin approves the draft-item void request ---------------------------
+POST {{baseUrl}}/sales/item-void-requests/{{draftItemVoidRequestId}}/approve/
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{ "review_note": "Approved - remove the line from the draft sale" }
+
+
+### 14d. Admin denies a draft-item void request -------------------------------
+# Optional example if you want to show the denial path instead.
+# POST {{baseUrl}}/sales/item-void-requests/{{draftItemVoidRequestId}}/deny/
+# Authorization: Bearer {{adminToken}}
+# Content-Type: {{contentType}}
+#
+# { "review_note": "Denied - keep the scanned line" }
+
+
 ### 15. Inspect the draft total before paying (see subtotal/discount/VAT) -------
 GET {{baseUrl}}/sales/sales/{{saleId}}/
 Authorization: Bearer {{cashierToken}}

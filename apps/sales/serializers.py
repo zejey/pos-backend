@@ -5,7 +5,8 @@ from rest_framework import serializers
 
 from apps.catalog.models import Product
 
-from .models import Payment, Sale, SaleItem
+from .models import Payment, Sale, SaleItem, SaleItemVoidRequest
+from .services import request_item_void
 
 
 class SaleItemSerializer(serializers.ModelSerializer):
@@ -132,3 +133,43 @@ class ReceiptSerializer(serializers.ModelSerializer):
         if obj.completed_at:
             return obj.completed_at.date()
         return None
+
+class SaleItemVoidRequestCreateSerializer(serializers.Serializer):
+    sale_item = serializers.IntegerField()
+    quantity = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.01"), required=False,
+        default=Decimal("1.00")
+    )
+    reason = serializers.CharField(max_length=255)
+
+    def create(self, validated_data):
+        sale_item = SaleItem.objects.select_related("sale", "product").get(pk=validated_data["sale_item"])
+        request = self.context.get("request")
+        return request_item_void(
+            sale=sale_item.sale,
+            sale_item_id=sale_item.pk,
+            quantity=validated_data.get("quantity", Decimal("1.00")),
+            reason=validated_data["reason"],
+            user=getattr(request, "user", None),
+        )
+
+
+class SaleItemVoidRequestReviewSerializer(serializers.Serializer):
+    review_note = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+
+class SaleItemVoidRequestSerializer(serializers.ModelSerializer):
+    requested_by = serializers.CharField(source="requested_by.username", read_only=True)
+    reviewed_by = serializers.CharField(source="reviewed_by.username", read_only=True)
+
+    class Meta:
+        model = SaleItemVoidRequest
+        fields = [
+            "id", "sale", "sale_item_id", "product_sku", "product_name",
+            "quantity", "reason", "status", "requested_by",
+            "reviewed_by", "reviewed_at", "review_note", "created_at",
+        ]
+        read_only_fields = [
+            "sale", "sale_item_id", "product_sku", "product_name", "status",
+            "requested_by", "reviewed_by", "reviewed_at", "review_note", "created_at",
+        ]

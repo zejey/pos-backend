@@ -109,7 +109,43 @@ Cashier                SaleViewSet               sales.services             pric
 The whole completion is atomic: if any line is short on stock, the entire sale
 rolls back — you can never half-sell or deduct partially.
 
-### 3. Void → reversal *(admin only)*
+### 3. Draft item void request → admin review
+
+This is the "wrong item was scanned" path for an unpaid cart.
+It applies only while the sale is still `DRAFT`.
+
+- cashier creates a void request for a scanned sale line
+- admin approves or denies the request
+- if approved, the requested quantity is removed from the draft cart
+- if denied, the draft sale is left unchanged
+
+```
+Cashier → POST /sales/item-void-requests/ {sale_item, quantity?, reason}
+      → pending request created against a draft sale line
+Admin   → POST /sales/item-void-requests/{id}/approve/  → line removed from draft sale
+Admin   → POST /sales/item-void-requests/{id}/deny/     → request marked denied
+```
+
+The request is separate from payment and separate from sale-level voiding.
+No inventory movement happens here because stock is only deducted when the
+sale is completed.
+
+### 4. Void → reversal *(admin only)*
+
+Void is the undo path for a sale that has already been completed and paid.
+It is not a generic refund or partial return flow. The service enforces three
+rules before doing anything:
+
+- the sale must already be `COMPLETED`
+- a non-empty reason must be supplied
+- the action must be performed by an admin
+
+If those checks pass, the reversal is applied transactionally:
+
+1. Each sale line is replayed back into inventory with a positive quantity.
+2. The stock ledger records a `SALE_REVERSAL` movement for each returned line.
+3. The sale is marked `VOID` and stamped with `voided_at` and `void_reason`.
+4. An audit log entry records the `SALE_VOID` action.
 
 ```
 Admin → POST /sales/{id}/void/ {reason}
@@ -117,7 +153,35 @@ Admin → POST /sales/{id}/void/ {reason}
                      status=VOID, voided_at, void_reason   →  log SALE_VOID
 ```
 
-### 4. Manual adjustment *(damaged stock, recounts)*
+Because the whole flow runs inside a database transaction, the sale status and
+stock ledger always change together. If the reversal fails at any point, the
+request rolls back and the completed sale remains untouched.
+
+Example:
+
+```http
+POST /api/sales/sales/42/void/
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{ "reason": "Customer requested cancellation after payment" }
+```
+
+Expected outcome:
+
+```json
+{
+      "status": "VOID",
+      "void_reason": "Customer requested cancellation after payment",
+      "voided_at": "2026-06-25T14:30:00Z"
+}
+```
+
+The sale's stock is not deleted. Instead, each sold line is written back into
+inventory as a `SALE_REVERSAL` movement, which restores on-hand quantity and
+preserves the audit trail.
+
+### 5. Manual adjustment *(damaged stock, recounts)*
 
 ```
 Admin → POST /inventory/movements/adjust/ {product, new_quantity|delta, reason}

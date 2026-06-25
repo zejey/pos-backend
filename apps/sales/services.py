@@ -12,7 +12,7 @@ from apps.inventory.models import StockMovement
 from apps.inventory.services import apply_movement
 from apps.pricing.services import get_effective_price
 
-from .models import Payment, Sale, SaleItem
+from .models import Payment, Sale, SaleItem, SaleItemVoidRequest
 
 HUNDRED = Decimal("100")
 
@@ -173,3 +173,95 @@ def void_sale(sale, reason, user=None):
     sale.void_reason = reason
     sale.save(update_fields=["status", "voided_at", "void_reason", "updated_at"])
     return sale
+
+
+@transaction.atomic
+def request_item_void(*, sale, sale_item_id, quantity, reason, user=None):
+    """Create a cashier request to void one or more units from a draft item."""
+    if sale.status != Sale.Status.DRAFT:
+        raise BusinessRuleError("Only draft sales can have item void requests.")
+
+    sale_item = sale.items.select_related("product").filter(pk=sale_item_id).first()
+    if sale_item is None:
+        raise BusinessRuleError("The selected sale item does not belong to this draft.")
+
+    quantity = Decimal(quantity)
+    if quantity <= 0:
+        raise BusinessRuleError("Void quantity must be positive.")
+    if quantity > sale_item.quantity:
+        raise BusinessRuleError("Void quantity cannot exceed the scanned quantity.")
+
+    if SaleItemVoidRequest.objects.filter(
+        sale=sale,
+        sale_item_id=sale_item_id,
+        status=SaleItemVoidRequest.Status.PENDING,
+    ).exists():
+        raise BusinessRuleError("There is already a pending void request for this item.")
+
+    return SaleItemVoidRequest.objects.create(
+        sale=sale,
+        sale_item_id=sale_item.pk,
+        product_sku=sale_item.product.sku,
+        product_name=sale_item.product.name,
+        quantity=quantity,
+        reason=reason,
+        requested_by=user,
+    )
+
+
+def _apply_item_void_request(request_obj, reviewer, approved, review_note=""):
+    with transaction.atomic():
+        request_obj = SaleItemVoidRequest.objects.select_for_update().select_related("sale").get(
+            pk=request_obj.pk
+        )
+        if request_obj.status != SaleItemVoidRequest.Status.PENDING:
+            raise BusinessRuleError("This void request has already been reviewed.")
+
+        request_obj.reviewed_by = reviewer
+        request_obj.reviewed_at = timezone.now()
+        request_obj.review_note = review_note or ""
+
+        if not approved:
+            request_obj.status = SaleItemVoidRequest.Status.DENIED
+            request_obj.save(update_fields=[
+                "status", "reviewed_by", "reviewed_at", "review_note", "updated_at",
+            ])
+            return request_obj
+
+        sale = Sale.objects.select_for_update().get(pk=request_obj.sale_id)
+        if sale.status != Sale.Status.DRAFT:
+            raise BusinessRuleError("Only draft sales can have item void requests approved.")
+
+        sale_item = sale.items.select_for_update().select_related("product").filter(
+            pk=request_obj.sale_item_id
+        ).first()
+        if sale_item is None:
+            raise BusinessRuleError("The requested sale item no longer exists.")
+        if request_obj.quantity > sale_item.quantity:
+            raise BusinessRuleError("The requested quantity is no longer available to void.")
+
+        remaining = sale_item.quantity - request_obj.quantity
+        if remaining > 0:
+            sale_item.quantity = remaining
+            sale_item.line_total = money(sale_item.unit_price * remaining)
+            sale_item.save(update_fields=["quantity", "line_total"])
+        else:
+            sale_item.delete()
+
+        sale = _recalculate(sale)
+
+        request_obj.status = SaleItemVoidRequest.Status.APPROVED
+        request_obj.save(update_fields=[
+            "status", "reviewed_by", "reviewed_at", "review_note", "updated_at",
+        ])
+        return request_obj
+
+
+def approve_item_void_request(request_obj, reviewer, review_note=""):
+    """Approve an item void request and remove the item from the draft sale."""
+    return _apply_item_void_request(request_obj, reviewer, approved=True, review_note=review_note)
+
+
+def deny_item_void_request(request_obj, reviewer, review_note=""):
+    """Deny an item void request."""
+    return _apply_item_void_request(request_obj, reviewer, approved=False, review_note=review_note)
