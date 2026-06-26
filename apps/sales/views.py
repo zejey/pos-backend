@@ -14,6 +14,7 @@ from .models import Sale, SaleItem, SaleItemVoidRequest
 from .serializers import (
     CartItemInputSerializer,
     CompleteSaleSerializer,
+    SaleItemVoidRequestApproveSerializer,
     SaleItemVoidRequestCreateSerializer,
     SaleItemVoidRequestReviewSerializer,
     SaleItemVoidRequestSerializer,
@@ -118,7 +119,9 @@ class SaleItemVoidRequestViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "create":
             return SaleItemVoidRequestCreateSerializer
-        if self.action in {"approve", "deny"}:
+        if self.action == "approve":
+            return SaleItemVoidRequestApproveSerializer
+        if self.action == "deny":
             return SaleItemVoidRequestReviewSerializer
         return SaleItemVoidRequestSerializer
 

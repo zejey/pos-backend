@@ -242,7 +242,7 @@ POST {{baseUrl}}/sales/item-void-requests/{{draftItemVoidRequestId}}/approve/
 Authorization: Bearer {{adminToken}}
 Content-Type: {{contentType}}
 
-{ "review_note": "Approved - remove the line from the draft sale" }
+{ "password": "{{adminPassword}}", "review_note": "Approved - remove the line from the draft sale" }
 
 
 ### 14d. Admin denies a draft-item void request -------------------------------

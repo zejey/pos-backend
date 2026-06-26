@@ -89,7 +89,7 @@ def test_admin_can_approve_item_void_request(make_product, cashier_api, admin_ap
 
     approve = admin_api.post(
         f"/api/sales/item-void-requests/{request_id}/approve/",
-        {"review_note": "approved"},
+        {"password": "pass12345", "review_note": "approved"},
         format="json",
     )
     assert approve.status_code == 200
@@ -121,6 +121,29 @@ def test_admin_can_deny_item_void_request(make_product, cashier_api, admin_api):
         format="json",
     )
     assert deny.status_code == 200
+
+
+def test_admin_must_confirm_password_to_approve_item_void(make_product, cashier_api, admin_api):
+    product = make_product(qty=Decimal("10"))
+    sale = Sale.objects.create(tax_rate=current_tax_rate())
+    set_sale_items(sale, [{"product": product.pk, "quantity": Decimal("1")}])
+    sale_item = sale.items.first()
+
+    resp = cashier_api.post(
+        "/api/sales/item-void-requests/",
+        {"sale_item": sale_item.pk, "reason": "wrong item scanned"},
+        format="json",
+    )
+    assert resp.status_code == 201
+    request_id = resp.data["id"]
+
+    approve = admin_api.post(
+        f"/api/sales/item-void-requests/{request_id}/approve/",
+        {"password": "wrong-password", "review_note": "approved"},
+        format="json",
+    )
+    assert approve.status_code == 400
+    assert "Admin password is incorrect." in approve.content.decode()
 
     sale.refresh_from_db()
     assert sale.items.count() == 1

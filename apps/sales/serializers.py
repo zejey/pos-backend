@@ -158,6 +158,18 @@ class SaleItemVoidRequestReviewSerializer(serializers.Serializer):
     review_note = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
 
+class SaleItemVoidRequestApproveSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    review_note = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or not user.check_password(attrs["password"]):
+            raise serializers.ValidationError({"password": "Admin password is incorrect."})
+        return attrs
+
+
 class SaleItemVoidRequestSerializer(serializers.ModelSerializer):
     requested_by = serializers.CharField(source="requested_by.username", read_only=True)
     reviewed_by = serializers.CharField(source="reviewed_by.username", read_only=True)
