@@ -45,9 +45,27 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Products already exist; skipping catalog seed."))
             return
 
+        meals = Category.objects.create(name="Meals")
+        rice_meals = Category.objects.create(name="Rice Meals")
         drinks = Category.objects.create(name="Drinks")
+        coffee = Category.objects.create(name="Coffee")
+        tea = Category.objects.create(name="Tea")
         snacks = Category.objects.create(name="Snacks")
+        bread_pastries = Category.objects.create(name="Bread & Pastries")
+        desserts = Category.objects.create(name="Desserts")
+        canned_goods = Category.objects.create(name="Canned Goods")
+        instant_foods = Category.objects.create(name="Instant Foods")
+        frozen_foods = Category.objects.create(name="Frozen Foods")
+        fruits_vegetables = Category.objects.create(name="Fruits & Vegetables")
+        dairy = Category.objects.create(name="Dairy")
+        personal_care = Category.objects.create(name="Personal Care")
+        household_items = Category.objects.create(name="Household Items")
+        cleaning_supplies = Category.objects.create(name="Cleaning Supplies")
         catalog = [
+            ("MEAL-001", "Chicken Adobo", meals, "150.00", "100.00", 24),
+            ("MEAL-002", "Pork Sinigang", meals, "120.00", "80.00", 24),
+            ("RICE-001", "Chicken Teriyaki Rice", rice_meals, "180.00", "120.00", 24),
+            ("RICE-002", "Beef Fried Rice", rice_meals, "160.00", "100.00", 24),
             ("BEV-001", "Bottled Water 500ml", drinks, "15.00", "10.00", 24),
             ("BEV-002", "Soft Drink Can", drinks, "30.00", "22.00", 24),
             ("BEV-003", "3-in-1 Coffee Sachet", drinks, "12.00", "8.00", 50),

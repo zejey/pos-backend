@@ -5,7 +5,7 @@ djangorestframework-simplejwt~=5.3
 
 # Database driver (PostgreSQL)
 psycopg[binary]~=3.2
-
+nanoid
 # API tooling
 django-cors-headers~=4.6
 django-filter~=24.3

@@ -1,13 +1,20 @@
 from decimal import Decimal
-
+from nanoid import generate
 from django.db import models
 
 from apps.common.models import TimeStampedModel
 
+SKU_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
+def generate_sku():
+    while True:
+        sku = f"SKU-{generate(SKU_ALPHABET, 12)}"
+        if not Product.objects.filter(sku=sku).exists():
+            return sku
+        
 class Category(TimeStampedModel):
     name = models.CharField(max_length=80, unique=True)
-    description = models.CharField(max_length=255, blank=True)
+    description = models.CharField(max_length=255, blank=True)  
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -27,7 +34,12 @@ class Product(TimeStampedModel):
     trail requirement).
     """
 
-    sku = models.CharField(max_length=40, unique=True)
+    sku = models.CharField(
+        max_length=20,
+        unique=True,
+        default=generate_sku,
+        editable=False,
+    )
     barcode = models.CharField(max_length=64, blank=True, db_index=True)
     name = models.CharField(max_length=160)
     category = models.ForeignKey(
