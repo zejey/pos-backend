@@ -7,13 +7,28 @@ from .services import log_activity
 
 
 class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        validators=[validate_password],
+    )
+
     class Meta:
         model = User
         fields = [
             "id", "username", "first_name", "last_name", "email",
-            "role", "is_active", "date_joined", "last_login",
+            "role", "is_active", "date_joined", "last_login", "password",
         ]
         read_only_fields = ["id", "date_joined", "last_login"]
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        user = super().update(instance, validated_data)
+        if password is not None:
+            user.set_password(password)
+            user.save(update_fields=["password"])
+        return user
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
