@@ -73,7 +73,7 @@ connection vars, and `CORS_ALLOWED_ORIGINS` for the React app.
 
 | Role | Username | Password |
 |------|----------|----------|
-| Admin | `admin` | `admin123` |
+| Admin | `admin` | `admin456` |
 | Cashier | `cashier` | `cashier123` |
 
 ---
@@ -141,7 +141,7 @@ Authorization: Bearer <access-token>
 # 1. Log in -> returns { "access", "refresh", "user" }
 curl -X POST localhost:8000/api/auth/login/ \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"username":"admin","password":"admin456"}'
 
 # 2. Reuse the access token on every call
 AUTH="Authorization: Bearer <access>"
