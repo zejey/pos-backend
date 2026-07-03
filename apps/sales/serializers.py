@@ -66,6 +66,7 @@ class SaleSerializer(serializers.ModelSerializer):
     change_due = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     net_of_tax = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     discount_name = serializers.CharField(source="discount.name", default=None, read_only=True)
+    completed_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Sale
@@ -87,6 +88,9 @@ class SaleSerializer(serializers.ModelSerializer):
         if discount and not discount.is_available():
             raise serializers.ValidationError("Selected discount is not active for today's date.")
         return discount
+
+    def get_completed_at(self, obj):
+        return format_local_datetime(obj.completed_at)
 
     def create(self, validated_data):
         from .services import current_tax_rate, set_sale_items
