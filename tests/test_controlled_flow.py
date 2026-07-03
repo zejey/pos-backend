@@ -1,4 +1,5 @@
 """TEST-01 — Controlled-flow happy path: stock-in -> sale -> void -> adjust."""
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -7,6 +8,8 @@ from model_bakery import baker
 from apps.inventory.models import StockMovement
 from apps.inventory.services import manual_adjustment
 from apps.purchasing.services import post_stock_in
+from apps.pricing.models import Discount, Promo
+from apps.pricing.services import get_effective_price
 from apps.sales.models import Sale
 from apps.sales.services import complete_sale, current_tax_rate, set_sale_items
 
@@ -39,6 +42,42 @@ def test_posting_stock_in_raises_quantity_and_refreshes_cost(make_product):
     assert mv.quantity == Decimal("50.00") and mv.balance_after == Decimal("50.00")
 
 
+def test_stock_in_discrepancy_is_logged_on_stock_movement(make_product):
+    product = make_product(qty=0, cost=Decimal("10.00"))
+    si = _stock_in(product, ordered="50", received="48", cost="12.50")
+    item = si.items.first()
+    item.discrepancy_reason = "2 items damaged on arrival"
+    item.save(update_fields=["discrepancy_reason"])
+
+    post_stock_in(si, user=None)
+
+    mv = StockMovement.objects.get(product=product, movement_type="STOCK_IN")
+    assert mv.quantity == Decimal("48.00")
+    assert "ordered 50.00, received 48.00" in mv.reason
+    assert "damaged" in mv.reason
+
+
+def test_current_promo_beats_future_promo(make_product):
+    from django.utils import timezone
+
+    product = make_product(qty=Decimal("10"), price=Decimal("100.00"))
+    today = timezone.localdate()
+    Promo.objects.create(
+        product=product,
+        promo_price=Decimal("80.00"),
+        start_date=today,
+        is_active=True,
+    )
+    Promo.objects.create(
+        product=product,
+        promo_price=Decimal("50.00"),
+        start_date=today + timedelta(days=7),
+        is_active=True,
+    )
+
+    assert get_effective_price(product) == Decimal("80.00")
+
+
 def test_completed_sale_deducts_stock_and_records_movement(make_product):
     product = make_product(qty=Decimal("100"), price=Decimal("50.00"))
     sale = Sale.objects.create(tax_rate=current_tax_rate())
@@ -55,6 +94,22 @@ def test_completed_sale_deducts_stock_and_records_movement(make_product):
     assert product.quantity_on_hand == Decimal("97.00")
     mv = StockMovement.objects.get(source_type="Sale", source_id=str(sale.pk))
     assert mv.movement_type == "SALE" and mv.quantity == Decimal("-3.00")
+
+
+def test_fixed_discount_cannot_create_negative_sale_total(make_product):
+    product = make_product(qty=Decimal("10"), price=Decimal("100.00"))
+    discount = Discount.objects.create(
+        name="Oversized coupon",
+        discount_type=Discount.Type.FIXED,
+        value=Decimal("250.00"),
+    )
+    sale = Sale.objects.create(tax_rate=current_tax_rate(), discount=discount)
+    set_sale_items(sale, [{"product": product.pk, "quantity": Decimal("1")}])
+    sale.refresh_from_db()
+
+    assert sale.subtotal == Decimal("100.00")
+    assert sale.discount_total == Decimal("100.00")
+    assert sale.total == Decimal("0.00")
 
 
 def test_void_returns_stock_and_writes_reversal(make_product):

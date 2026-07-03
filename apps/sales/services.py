@@ -48,6 +48,11 @@ def _recalculate(sale):
     return sale
 
 
+def recalculate_sale(sale):
+    """Public wrapper for API updates that change sale-level pricing fields."""
+    return _recalculate(sale)
+
+
 @transaction.atomic
 def set_sale_items(sale, items):
     """Replace the cart contents. Prices are snapshotted at add time.

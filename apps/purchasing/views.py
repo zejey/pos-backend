@@ -47,8 +47,14 @@ class StockInViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         stock_in = serializer.save(created_by=self.request.user)
+        discrepancy_count = sum(1 for item in stock_in.items.all() if item.discrepancy_qty)
         log_activity(self.request.user, "STOCKIN_CREATE", entity="StockIn",
-                     entity_id=stock_in.pk, detail={"reference_no": stock_in.reference_no},
+                     entity_id=stock_in.pk,
+                     detail={
+                         "reference_no": stock_in.reference_no,
+                         "items": stock_in.items.count(),
+                         "discrepancies": discrepancy_count,
+                     },
                      request=self.request)
 
     @action(detail=True, methods=["post"])
@@ -56,8 +62,15 @@ class StockInViewSet(viewsets.ModelViewSet):
         """Post the stock-in: received quantities flow into inventory."""
         stock_in = self.get_object()
         post_stock_in(stock_in, user=request.user)
+        discrepancy_count = sum(1 for item in stock_in.items.all() if item.discrepancy_qty)
         log_activity(request.user, "STOCKIN_POST", entity="StockIn",
-                     entity_id=stock_in.pk, detail={"reference_no": stock_in.reference_no},
+                     entity_id=stock_in.pk,
+                     detail={
+                         "reference_no": stock_in.reference_no,
+                         "items": stock_in.items.count(),
+                         "discrepancies": discrepancy_count,
+                         "total_cost": str(stock_in.total_cost),
+                     },
                      request=request)
         return Response(self.get_serializer(stock_in).data)
 

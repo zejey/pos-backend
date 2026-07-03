@@ -65,14 +65,12 @@ class SaleSerializer(serializers.ModelSerializer):
     amount_paid = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     change_due = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     net_of_tax = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
-    completed_at = serializers.SerializerMethodField()
-    voided_at = serializers.SerializerMethodField()
-    created_at = serializers.SerializerMethodField()
+    discount_name = serializers.CharField(source="discount.name", default=None, read_only=True)
 
     class Meta:
         model = Sale
         fields = [
-            "id", "receipt_no", "cashier", "status", "discount",
+            "id", "receipt_no", "cashier", "status", "discount", "discount_name",
             "subtotal", "discount_total", "total",
             "tax_rate", "tax_amount", "net_of_tax",
             "amount_paid", "change_due", "note",
@@ -84,6 +82,11 @@ class SaleSerializer(serializers.ModelSerializer):
             "tax_rate", "tax_amount",
             "completed_at", "voided_at", "void_reason",
         ]
+
+    def validate_discount(self, discount):
+        if discount and not discount.is_available():
+            raise serializers.ValidationError("Selected discount is not active for today's date.")
+        return discount
 
     def create(self, validated_data):
         from .services import current_tax_rate, set_sale_items
@@ -100,14 +103,22 @@ class SaleSerializer(serializers.ModelSerializer):
             set_sale_items(sale, cart)
         return sale
 
-    def get_completed_at(self, obj):
-        return format_local_datetime(obj.completed_at)
+    def update(self, instance, validated_data):
+        from .services import set_sale_items, recalculate_sale
 
-    def get_voided_at(self, obj):
-        return format_local_datetime(obj.voided_at)
+        cart = validated_data.pop("cart", None)
+        if instance.status != Sale.Status.DRAFT:
+            raise serializers.ValidationError("Only draft sales can be updated.")
 
-    def get_created_at(self, obj):
-        return format_local_datetime(obj.created_at)
+        if "discount" in validated_data:
+            instance.discount = validated_data["discount"]
+        if "note" in validated_data:
+            instance.note = validated_data["note"]
+        instance.save(update_fields=["discount", "note", "updated_at"])
+
+        if cart is not None:
+            return set_sale_items(instance, cart)
+        return recalculate_sale(instance)
 
 
 class CompleteSaleSerializer(serializers.Serializer):

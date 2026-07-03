@@ -29,12 +29,19 @@ def post_stock_in(stock_in, user=None):
     for item in items:
         if item.quantity_received <= 0:
             continue
+        reason = ""
+        if item.discrepancy_qty:
+            reason = (
+                f"Stock-in discrepancy: ordered {item.quantity_ordered}, "
+                f"received {item.quantity_received}. {item.discrepancy_reason}"
+            ).strip()
         apply_movement(
             product=item.product_id,
             quantity=item.quantity_received,
             movement_type=StockMovement.Type.STOCK_IN,
             user=user,
             reference=stock_in.reference_no,
+            reason=reason,
             source=stock_in,
         )
         # Refresh latest cost for profit estimation.
