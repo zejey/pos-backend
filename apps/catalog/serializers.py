@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import Category, Product
@@ -15,6 +17,13 @@ class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", default=None, read_only=True)
     is_low_stock = serializers.BooleanField(read_only=True)
     stock_value = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+    reorder_level = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        default=Decimal("5.00"),
+        min_value=Decimal("0.00"),
+    )
 
     class Meta:
         model = Product

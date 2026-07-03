@@ -22,6 +22,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalog.models import Product
+from apps.common.formatting import format_local_date
 from apps.common.pagination import DefaultPagination
 from apps.common.permissions import IsAdmin
 from apps.purchasing.models import StockIn
@@ -71,8 +72,8 @@ class SalesSummaryReport(APIView):
         )
         return Response({
             "period": period,
-            "start": start,
-            "end": end,
+            "start": format_local_date(start),
+            "end": format_local_date(end),
             "transactions": agg["transactions"],
             "gross_sales": agg["gross_sales"],
             "total_discount": agg["total_discount"],
@@ -106,7 +107,11 @@ class TopProductsReport(APIView):
             )
             .order_by("-quantity_sold")[:limit]
         )
-        return Response({"start": start, "end": end, "results": list(rows)})
+        return Response({
+            "start": format_local_date(start),
+            "end": format_local_date(end),
+            "results": list(rows),
+        })
 
 
 class InventoryStatusReport(APIView):
@@ -171,13 +176,14 @@ class StockInHistoryReport(APIView):
             "id": s.id,
             "reference_no": s.reference_no,
             "supplier": s.supplier.name if s.supplier else None,
-            "purchase_date": s.purchase_date,
+            "purchase_date": format_local_date(s.purchase_date),
             "total_cost": s.total_cost,
             "item_count": s.items.count(),
         } for s in stock_ins]
         total = sum((r["total_cost"] for r in results), ZERO)
         return Response({
-            "start": start, "end": end,
+            "start": format_local_date(start),
+            "end": format_local_date(end),
             "purchase_count": len(results),
             "total_purchase_cost": total,
             "results": results,
@@ -208,7 +214,8 @@ class ProfitEstimateReport(APIView):
         )
         revenue, cogs = agg["revenue"], agg["cogs"]
         return Response({
-            "start": start, "end": end,
+            "start": format_local_date(start),
+            "end": format_local_date(end),
             "revenue": revenue,
             "estimated_cogs": cogs,
             "estimated_profit": (revenue - cogs),
@@ -247,7 +254,7 @@ class DashboardReport(APIView):
             .first()
         )
         return Response({
-            "date": today,
+            "date": format_local_date(today),
             "today": {
                 "transactions": sales_agg["transactions"],
                 "gross_sales": sales_agg["gross_sales"],

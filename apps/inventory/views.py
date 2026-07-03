@@ -1,3 +1,6 @@
+import csv
+
+from django.http import HttpResponse
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -5,6 +8,7 @@ from rest_framework.response import Response
 from apps.accounts.services import log_activity
 from apps.catalog.models import Product
 from apps.catalog.serializers import ProductSerializer
+from apps.common.formatting import format_local_datetime
 from apps.common.permissions import IsAdmin
 
 from .models import StockMovement
@@ -54,3 +58,32 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by("quantity_on_hand")
         )
         return Response(ProductSerializer(products, many=True).data)
+
+    @action(detail=False, methods=["get"])
+    def export(self, request):
+        """Export the filtered inventory audit trail as CSV."""
+        movements = self.filter_queryset(self.get_queryset())
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="inventory-movements.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            "created_at", "product_sku", "product_name", "movement_type",
+            "quantity", "balance_after", "reference", "reason",
+            "source_type", "source_id", "user",
+        ])
+        for movement in movements:
+            writer.writerow([
+                format_local_datetime(movement.created_at),
+                movement.product.sku,
+                movement.product.name,
+                movement.movement_type,
+                movement.quantity,
+                movement.balance_after,
+                movement.reference,
+                movement.reason,
+                movement.source_type,
+                movement.source_id,
+                movement.user.username if movement.user else "",
+            ])
+        return response
