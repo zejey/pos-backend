@@ -4,6 +4,11 @@ New capabilities beyond the brief's core features. Grouped by area. Several are
 **business-type dependent** — see the matrix at the bottom; pick based on what
 the professor confirms as the target business.
 
+Status legend:
+- ✅ DONE = fully implemented in the backend
+- ◑ PARTIAL = some backend support exists, but the feature is not complete
+- TODO = not implemented yet
+
 ## A. Point of Sale
 
 | ID | Priority | Effort | Status | Item |
@@ -39,9 +44,11 @@ the professor confirms as the target business.
 |----|----------|--------|--------|------|
 | FEAT-08 | P2 | M | ✅ DONE | Supplier model (replaced free-text `supplier` on stock-in) — see [data-model.md](data-model.md) |
 | FEAT-09 | P2 | M | TODO | Purchase-order generation + reorder suggestions from low-stock |
-| FEAT-10 | P3 | S | TODO | Bulk CSV import (products, stock-in) |
+| FEAT-10 | P3 | S | ✅ DONE | Bulk CSV import (products and stock-in) |
 | FEAT-11 | P3 | L | TODO | Multi-location / branch stock |
 | FEAT-16 | P3 | M | TODO | Product images (upload + serve) |
+
+- **FEAT-10** is now implemented for both products and stock-in imports. Product CSV import uses `POST /api/catalog/products/import-csv/`, and stock-in CSV import uses `POST /api/purchasing/stock-ins/import-csv/`.
 
 ## D. Reports & Dashboard
 

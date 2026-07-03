@@ -37,6 +37,9 @@ def test_complete_sale_logs_activity(make_product, cashier_api):
         format="json"
     )
     assert resp.status_code == 200
+    body = resp.json()
+    assert "T" not in body["completed_at"]
+    assert "AM" in body["completed_at"] or "PM" in body["completed_at"]
 
 
 def test_void_sale_logs_activity(make_product, admin_api):

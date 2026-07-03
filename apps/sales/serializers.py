@@ -1,9 +1,11 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.catalog.models import Product
+from apps.common.formatting import format_local_date, format_local_datetime
 
 from .models import Payment, Sale, SaleItem, SaleItemVoidRequest
 from .services import request_item_void
@@ -138,6 +140,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
     net_of_tax = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     tax_label = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()
+    completed_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Sale
@@ -154,8 +157,11 @@ class ReceiptSerializer(serializers.ModelSerializer):
     def get_date(self, obj):
         """Return the receipt date (from completed_at)."""
         if obj.completed_at:
-            return obj.completed_at.date()
+            return format_local_date(timezone.localtime(obj.completed_at).date())
         return None
+
+    def get_completed_at(self, obj):
+        return format_local_datetime(obj.completed_at)
 
 class SaleItemVoidRequestCreateSerializer(serializers.Serializer):
     sale_item = serializers.IntegerField()

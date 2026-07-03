@@ -52,17 +52,26 @@ class Product(TimeStampedModel):
     unit = models.CharField(max_length=20, default="pc")
 
     cost_price = models.DecimalField(
-        max_digits=12, decimal_places=2, default=Decimal("0.00")
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Supplier unit cost used for inventory valuation and profit estimates.",
     )
     selling_price = models.DecimalField(
-        max_digits=12, decimal_places=2, default=Decimal("0.00")
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Customer-facing unit price used at checkout.",
     )
 
     quantity_on_hand = models.DecimalField(
         max_digits=12, decimal_places=2, default=Decimal("0.00"), editable=False
     )
     reorder_level = models.DecimalField(
-        max_digits=12, decimal_places=2, default=Decimal("0.00")
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("5.00"),
+        help_text="Automatic low-stock threshold used for alerts and reorder reports.",
     )
 
     is_active = models.BooleanField(default=True)
