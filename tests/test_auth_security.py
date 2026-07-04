@@ -15,6 +15,20 @@ def test_login_returns_tokens(api, cashier_user):
     assert "access" in body and "refresh" in body
 
 
+def test_login_updates_last_login(api, cashier_user):
+    assert cashier_user.last_login is None
+
+    resp = api.post(
+        "/api/auth/login/",
+        {"username": "cashier", "password": "pass12345"},
+        format="json",
+    )
+    assert resp.status_code == 200
+
+    cashier_user.refresh_from_db()
+    assert cashier_user.last_login is not None
+
+
 def test_logout_blacklists_refresh_token(api, cashier_user):
     tokens = api.post(
         "/api/auth/login/",
