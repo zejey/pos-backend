@@ -4,6 +4,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 import pytest
 
+from apps.catalog.models import Product
 from apps.sales.models import Sale
 from apps.sales.services import complete_sale, current_tax_rate, set_sale_items
 
@@ -69,6 +70,36 @@ def test_product_csv_import(make_product, admin_api):
     data = resp.json()
     assert data["created"] == 2
     assert any(item["sku"] == "CSV-001" for item in data["products"])
+
+
+def test_product_delete_archives_instead_of_hard_deleting(make_product, admin_api):
+    product = make_product(qty=Decimal("3"), name="Duplicate Item")
+
+    resp = admin_api.delete(f"/api/catalog/products/{product.pk}/")
+
+    assert resp.status_code == 204
+    product.refresh_from_db()
+    assert product.is_active is False
+    assert Product.objects.filter(pk=product.pk).exists()
+
+
+def test_product_csv_import_skips_existing_product_by_barcode(make_product, admin_api):
+    make_product(name="Coffee", barcode="4800000000999", sku="COF-001")
+    csv_data = (
+        "name,sku,barcode,category,unit,cost_price,selling_price,reorder_level,is_active\n"
+        "Coffee,,4800000000999,,pc,12.50,25.00,4,true\n"
+    )
+    upload = SimpleUploadedFile("products.csv", csv_data.encode("utf-8"), content_type="text/csv")
+
+    resp = admin_api.post(
+        "/api/catalog/products/import-csv/",
+        {"file": upload},
+        format="multipart",
+    )
+
+    assert resp.status_code == 201
+    assert resp.json()["created"] == 0
+    assert Product.objects.filter(name="Coffee").count() == 1
 
 
 def test_stock_in_csv_import(make_product, admin_api):

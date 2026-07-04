@@ -2,6 +2,7 @@ import csv
 from decimal import Decimal, InvalidOperation
 from io import StringIO
 
+from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -41,6 +42,11 @@ class ProductViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         log_activity(self.request.user, "PRODUCT_CREATE", entity="Product",
                      entity_id=product.pk, detail={"sku": product.sku},
                      request=self.request)
+
+    def perform_destroy(self, instance):
+        instance.is_active = False
+        instance.save(update_fields=["is_active"])
+        self._log(instance.pk, "DELETE")
 
     @action(detail=False, methods=["post"])
     def batch(self, request):
@@ -83,6 +89,8 @@ class ProductViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         products = []
         errors = []
         seen_skus = set()
+        seen_barcodes = set()
+        seen_names = set()
         category_cache = {}
 
         def parse_decimal(raw_value, field_name, row_number, default=None):
@@ -135,14 +143,21 @@ class ProductViewSet(ActivityLogMixin, viewsets.ModelViewSet):
                         "detail": "Duplicate SKU in CSV file.",
                     })
                     continue
-                if Product.objects.filter(sku=sku).exists():
-                    errors.append({
-                        "row": row_number,
-                        "field": "sku",
-                        "detail": "SKU already exists.",
-                    })
+                if Product.objects.filter(Q(sku=sku) | Q(barcode=barcode) | Q(name__iexact=name)).exists():
                     continue
                 seen_skus.add(sku)
+            elif barcode:
+                if barcode in seen_barcodes:
+                    continue
+                if Product.objects.filter(Q(barcode=barcode) | Q(name__iexact=name)).exists():
+                    continue
+                seen_barcodes.add(barcode)
+            elif name:
+                if name.lower() in seen_names:
+                    continue
+                if Product.objects.filter(Q(name__iexact=name)).exists():
+                    continue
+                seen_names.add(name.lower())
 
             category = None
             if category_raw:
