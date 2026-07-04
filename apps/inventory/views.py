@@ -12,8 +12,8 @@ from apps.common.formatting import format_local_datetime
 from apps.common.permissions import IsAdmin
 
 from .models import StockMovement
-from .serializers import ManualAdjustmentSerializer, StockMovementSerializer
-from .services import manual_adjustment
+from .serializers import ManualAdjustmentSerializer, OpeningStockSerializer, StockMovementSerializer
+from .services import manual_adjustment, set_opening_stock
 
 
 class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
@@ -43,6 +43,26 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
             request.user, "STOCK_ADJUSTMENT", entity="Product",
             entity_id=data["product"].pk,
             detail={"quantity": str(movement.quantity), "reason": data["reason"]},
+            request=request,
+        )
+        return Response(StockMovementSerializer(movement).data)
+    
+    @action(detail=False, methods=["post"])
+    def opening(self, request):
+        """Set opening stock for a newly created product (logs as OPENING)."""
+        serializer = OpeningStockSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        movement = set_opening_stock(
+            product=data["product"],
+            quantity=data["quantity"],
+            reason=data.get("reason") or "Opening stock",
+            user=request.user,
+        )
+        log_activity(
+            request.user, "STOCK_OPENING", entity="Product",
+            entity_id=data["product"].pk,
+            detail={"quantity": str(movement.quantity), "reason": data.get("reason")},
             request=request,
         )
         return Response(StockMovementSerializer(movement).data)
