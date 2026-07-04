@@ -26,7 +26,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
 
 class PaymentSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(
-        max_digits=14, decimal_places=2, min_value=Decimal("0.01")
+        max_digits=14, decimal_places=2, min_value=Decimal("0.00")
     )
     tendered = serializers.DecimalField(
         max_digits=14, decimal_places=2, min_value=Decimal("0.00"), required=False
