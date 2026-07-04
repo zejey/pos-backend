@@ -94,3 +94,22 @@ def manual_adjustment(*, product, new_quantity=None, delta=None, reason, user=No
             user=user,
             allow_negative=True,  # corrections may legitimately set any count
         )
+    
+def set_opening_stock(*, product, quantity, reason="Opening stock", user=None):
+    """Record the starting balance for a newly created product.
+
+    Used when a product is created with a non-zero initial count (manual
+    add-product form or Excel import). This is not a correction to an
+    existing balance, so it always logs as OPENING rather than ADJUSTMENT.
+    """
+    quantity = Decimal(quantity)
+    if quantity <= 0:
+        raise BusinessRuleError("Opening stock must be a positive quantity.")
+
+    return apply_movement(
+        product=product,
+        quantity=quantity,
+        movement_type=StockMovement.Type.STOCK_IN,
+        reason=reason,
+        user=user,
+    )

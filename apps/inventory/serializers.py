@@ -44,3 +44,12 @@ class ManualAdjustmentSerializer(serializers.Serializer):
         if attrs.get("delta") is not None and attrs["delta"] == 0:
             raise serializers.ValidationError("'delta' must be non-zero.")
         return attrs
+    
+class OpeningStockSerializer(serializers.Serializer):
+    """Input for setting a new product's opening stock balance."""
+
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    quantity = serializers.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal("0.01"),
+    )
+    reason = serializers.CharField(max_length=255, required=False, default="Opening stock")
