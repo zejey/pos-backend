@@ -102,6 +102,8 @@ def test_fixed_discount_cannot_create_negative_sale_total(make_product):
         name="Oversized coupon",
         discount_type=Discount.Type.FIXED,
         value=Decimal("250.00"),
+        min_items_required=1,  # Override default to test capping behavior
+        min_final_total_percent=Decimal("0.00"),  # Allow 100% discount for this test
     )
     sale = Sale.objects.create(tax_rate=current_tax_rate(), discount=discount)
     set_sale_items(sale, [{"product": product.pk, "quantity": Decimal("1")}])

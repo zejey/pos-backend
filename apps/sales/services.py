@@ -34,10 +34,11 @@ def vat_inclusive_tax(gross, rate):
 
 def _recalculate(sale):
     """Recompute subtotal/discount/total (and carved-out VAT) from the items."""
-    subtotal = sum((i.line_total for i in sale.items.all()), Decimal("0.00"))
+    items = list(sale.items.all())
+    subtotal = sum((i.line_total for i in items), Decimal("0.00"))
     discount_total = Decimal("0.00")
     if sale.discount and sale.discount.is_available():
-        discount_total = sale.discount.compute(subtotal)
+        discount_total = sale.discount.compute(subtotal, item_count=len(items))
     sale.subtotal = money(subtotal)
     sale.discount_total = money(discount_total)
     sale.total = money(subtotal - discount_total)
